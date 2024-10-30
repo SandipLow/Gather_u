@@ -1,0 +1,11 @@
+{
+  "name": "gather_u",
+  "scripts": {
+    "dev": "cd client && npm run dev & cd server && npm run dev"
+  },
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Sandip Low",
+  "license": "MIT",
+  "private": false
+}
