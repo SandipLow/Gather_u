@@ -1,11 +1,5 @@
 import db from "../db";
 
-export interface UserData {
-    id: string;
-    name: string;
-    email: string;
-}
-
 export default class User {
     id: string;
     name: string;

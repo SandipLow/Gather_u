@@ -1,3 +1,5 @@
+import { fetchUserData } from "../lib/api";
+
 export default class MainMenuScene extends Phaser.Scene {
     private user_id: string | null = null;
 
@@ -9,33 +11,46 @@ export default class MainMenuScene extends Phaser.Scene {
         // Set a solid color background
         this.cameras.main.setBackgroundColor('#222222');
 
+        this.add.text(this.scale.width / 2, 50, 'Welcome to the GATHER U', {
+            fontSize: '32px',
+            color: '#ffffff',
+        }).setOrigin(0.5, 0);
+
+        this.add.text(this.scale.width / 2, 200, 'Main Menu', {
+            fontSize: '16px',
+            color: '#ffffff',
+        }).setOrigin(0.5, 0);
+
         // Prompt for user ID and fetch user data
-        this.user_id = prompt('Enter your user ID');
+        this.user_id = localStorage.getItem("user_id")
         if (!this.user_id) {
-            alert("User ID is required to proceed.");
+            // render a text showing user not logged in
+            this.add.text(this.scale.width / 2, this.scale.height / 2, `User not logged in`, {
+                fontSize: '16px',
+                color: '#ffffff',
+            }).setOrigin(0.5, 0.5);
             return;
         }
 
-        const fetchUser = await fetch(`http://localhost:3000/user/${this.user_id}`);
-        const userData = await fetchUser.json();
+        const userData = await fetchUserData();
 
         // Extract worlds (formerly 'players') from user data
         const { players } = userData;
 
         // Display title and instructions
-        this.add.text(this.scale.width / 2, 50, `Select a World to Enter`, {
-            fontSize: '24px',
+        this.add.text(this.scale.width / 2, 250, `Select a World to Enter`, {
+            fontSize: '16px',
             color: '#ffffff',
         }).setOrigin(0.5, 0.5);
 
         // Display each world as a selectable option with a colored rectangle as a button
-        let yOffset = 150; 
+        let yOffset = 300; 
         players.forEach((player: any) => {
             const { name, wealth, world } = player;
 
             // Display world name as text
             const worldText = this.add.text(100, yOffset, `🌏 ${world.name} ( ${name} has $${wealth} )`, {
-                fontSize: '12px',
+                fontSize: '16px',
                 color: '#ffffff'
             });
 

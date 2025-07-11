@@ -4,8 +4,10 @@ import Strings from './res/strings';
 import db from './db';
 import http from 'http';
 import Redis from 'ioredis';
+import { v4 as uuidv4 } from 'uuid';
 
 export default class SocketServer {
+    serverid: string = "";
     worlds: { [id: string]: World } = {};
     players: { [id: string]: Player } = {};
     wss: WebSocketServer;
@@ -15,17 +17,37 @@ export default class SocketServer {
     redisSub: Redis;
 
     constructor(server: http.Server) {
+        // Generate a unique server ID
+        this.serverid = uuidv4();
+        
+        // Create WebSocket server
+        this.wss = new WebSocketServer({ server });
+        this.wss.on("connection", this.onConnection.bind(this));
+        
+        // Connect to Redis
         const redisUrl = process.env.REDIS_URI;
-        if (!redisUrl) {
+        const redisUsername = process.env.REDIS_USERNAME;
+        const redisPassword = process.env.REDIS_PASSWORD;
+
+        if (!redisUrl || !redisUsername || !redisPassword) {
             console.error('Redis URI not provided');
             process.exit(1);
         }
+        
+        this.redisPub = new Redis({
+            username: redisUsername,
+            password: redisPassword,
+            port: parseInt(redisUrl.split(':')[1]),
+            host: redisUrl.split(':')[0],
+        });
+        this.redisSub = new Redis({
+            username: redisUsername,
+            password: redisPassword,
+            port: parseInt(redisUrl.split(':')[1]),
+            host: redisUrl.split(':')[0]
+        });
 
-        this.wss = new WebSocketServer({ server });
-        this.redisPub = new Redis(redisUrl);
-        this.redisSub = new Redis(redisUrl);
-
-        this.wss.on("connection", this.onConnection.bind(this));
+        // fetch current world and players 
 
         // Subscribe to relevant Redis channels
         this.redisSub.subscribe('world-events', (err, count) => {
@@ -46,20 +68,25 @@ export default class SocketServer {
 
     // This will handle incoming messages from Redis Pub-Sub
     onRedisMessage(channel: string, message: string) {
-        const { type, payload } = JSON.parse(message);
+        const { type, payload, serverid } = JSON.parse(message);
+
+        // Ignore messages from this server
+        if (serverid === this.serverid) return;
+        
+        console.log('Received message from Redis:', message);
 
         switch (type) {
             case Strings.WS_ENTER_WORLD:
                 // Handle player entering the world
-                this.handleRemoteEnterWorld(payload);
+                this.handleEnterWorld(payload, null);
                 break;
 
             case Strings.WS_LEAVE_WORLD:
-                this.handleRemoteLeaveWorld(payload);
+                this.handleLeaveWorld(payload);
                 break;
 
             case Strings.WS_MOVE:
-                this.handleRemoteMove(payload);
+                this.handleMove(payload);
                 break;
 
             default:
@@ -76,19 +103,19 @@ export default class SocketServer {
                 case Strings.WS_ENTER_WORLD:
                     this.handleEnterWorld(payload, ws);
                     // Publish event to Redis
-                    this.redisPub.publish('world-events', JSON.stringify({ type: Strings.WS_ENTER_WORLD, payload }));
+                    this.redisPub.publish('world-events', JSON.stringify({ type, payload, serverid: this.serverid }));
                     break;
 
                 case Strings.WS_LEAVE_WORLD:
                     this.handleLeaveWorld(payload);
                     // Publish event to Redis
-                    this.redisPub.publish('world-events', JSON.stringify({ type: Strings.WS_LEAVE_WORLD, payload }));
+                    this.redisPub.publish('world-events', JSON.stringify({ type, payload, serverid: this.serverid }));
                     break;
 
                 case Strings.WS_MOVE:
                     this.handleMove(payload);
                     // Publish move event to Redis
-                    this.redisPub.publish('world-events', JSON.stringify({ type: Strings.WS_MOVE, payload }));
+                    this.redisPub.publish('world-events', JSON.stringify({ type, payload, serverid: this.serverid }));
                     break;
 
                 default:
@@ -113,7 +140,7 @@ export default class SocketServer {
     }
 
     // Handle player entering the world
-    handleEnterWorld(payload: any, ws: WebSocket) {
+    handleEnterWorld(payload: any, ws: WebSocket | null) {
         const { player_id } = payload;
 
         // Is the player already playing?
@@ -129,6 +156,8 @@ export default class SocketServer {
         this.worlds[world.id] = world;
 
         world.addPlayer(player);
+
+        if (!ws) return
 
         // Send online players' data to the new player
         for (const p of world.getOnlinePlayers()) {
@@ -167,7 +196,7 @@ export default class SocketServer {
 
     // Handle move event
     handleMove(payload: any) {
-        const { player_id, data: { x, y, animation } } = payload;
+        const { player_id, data: { x, y, animation, timestamp } } = payload;
 
         const player = this.players[player_id];
         if (!player) return;
@@ -175,51 +204,6 @@ export default class SocketServer {
         const world = this.worlds[player.world_id];
         if (!world) return;
 
-        world.move(player, x, y, animation);
-    }
-
-    // Handle remote player entering world (received from Redis)
-    handleRemoteEnterWorld(payload: any) {
-        const { player_id } = payload;
-
-        if (this.players[player_id]) return; // Ignore if already processed locally
-
-        const playerData = db.Players[player_id];
-        if (!playerData) return;
-
-        const player = new Player(playerData, null); // No WebSocket for remote player
-        this.players[player_id] = player;
-
-        const world = this.worlds[player.world_id] || new World(db.Worlds[player.world_id]);
-        this.worlds[world.id] = world;
-
-        world.addPlayer(player);
-    }
-
-    // Handle remote player leaving world (received from Redis)
-    handleRemoteLeaveWorld(payload: any) {
-        const { player_id } = payload;
-
-        const player = this.players[player_id];
-        if (!player) return;
-
-        const world = this.worlds[player.world_id];
-        if (!world) return;
-
-        world.removePlayer(player);
-        delete this.players[player_id];
-    }
-
-    // Handle remote player movement (received from Redis)
-    handleRemoteMove(payload: any) {
-        const { player_id, data: { x, y, animation } } = payload;
-
-        const player = this.players[player_id];
-        if (!player) return;
-
-        const world = this.worlds[player.world_id];
-        if (!world) return;
-
-        world.move(player, x, y, animation);
+        world.move(player, x, y, animation, timestamp);
     }
 }

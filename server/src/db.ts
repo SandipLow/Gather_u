@@ -1,6 +1,3 @@
-import { UserData } from "./models/User";
-import { WorldData } from "./models/World";
-import { PlayerData } from "./models/Player";
 
 interface Database {
     Users: { [key: string]: UserData };

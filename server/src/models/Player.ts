@@ -1,16 +1,6 @@
 import WebSocket from 'ws'
 import db from '../db'
 
-export interface PlayerData {
-    id: string
-    user_id: string
-    world_id: string
-    name: string
-    wealth: number
-    spritesheet: string
-    checkpoint: { x: number, y: number }
-}
-
 export default class Player {
     // Personal information
     id: string
@@ -74,6 +64,24 @@ export default class Player {
             spritesheet: this.spritesheet,
             checkpoint: this.checkpoint
         }
+    }
+
+    // export the player data (For saving the player)
+    exportData(): PlayerData {
+        return {
+            id: this.id,
+            user_id: this.user_id,
+            world_id: this.world_id,
+            name: this.name,
+            wealth: this.wealth,
+            spritesheet: this.spritesheet,
+            checkpoint: this.checkpoint
+        }
+    }
+
+    // create a player from data (For loading the player)
+    static createPlayer(data: PlayerData, socket: WebSocket | null) {
+        return new Player(data, socket)
     }
 
 }

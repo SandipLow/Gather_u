@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { OtherPlayer, Player } from './Player';
 import { sprites } from './assets';
+import { connectToWebSocket } from '../lib/websocket';
 
 export default class CityScene extends Phaser.Scene {
     private player: Player | null = null;
@@ -57,7 +58,7 @@ export default class CityScene extends Phaser.Scene {
         
 
         // Connect to the server
-        this.socket = new WebSocket(import.meta.env.VITE_WS_URL || 'ws://localhost:3000');
+        this.socket = connectToWebSocket();
 
         this.socket.onopen = () => {
             console.log('Connected to server');
@@ -80,9 +81,9 @@ export default class CityScene extends Phaser.Scene {
 
             // Listen for player movement events
             else if (type === 'move') {
-                const { player_id, data: { x, y, animation } } = payload;
+                const { player_id, data: { x, y, animation, timestamp } } = payload;
                 if (this.otherPlayers[player_id]) {
-                    this.otherPlayers[player_id].update(animation, x, y);
+                    this.otherPlayers[player_id].update(animation, x, y, timestamp);
                 }
             }
 

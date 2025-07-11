@@ -4,7 +4,7 @@
     "description": "",
     "scripts": {
         "build": "tsc -b",
-        "dev": "tsc -w & nodemon dist/index.js",
+        "dev": "nodemon src/index.ts",
         "start": "node dist/index.js"
     },
     "dependencies": {
@@ -12,6 +12,7 @@
         "dotenv": "^16.4.5",
         "express": "^4.21.1",
         "ioredis": "^5.4.1",
+        "uuid": "^11.0.3",
         "ws": "^8.18.0"
     },
     "devDependencies": {
@@ -19,7 +20,11 @@
         "@types/express": "^5.0.0",
         "@types/express-ws": "^3.0.5",
         "@types/ioredis": "^5.0.0",
-        "@types/ws": "^8.5.12"
+        "@types/ws": "^8.5.12",
+        "nodemon": "^3.1.10",
+        "ts-node": "^10.9.2",
+        "tsc": "^2.0.4",
+        "typescript": "^5.8.3"
     },
     "main": "index.js",
     "license": "MIT"

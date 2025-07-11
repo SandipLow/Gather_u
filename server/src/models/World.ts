@@ -2,9 +2,8 @@ import db from "../db";
 import Strings from "../res/strings";
 import Player from "./Player";
 
-export interface WorldData {
-    id: string;
-    name: string;
+export interface WorldDataWithPlayers extends WorldData {
+    onlinePlayers: PlayerData[];
 }
 
 export default class World {
@@ -91,7 +90,7 @@ export default class World {
     }
 
     // movement logic
-    move(player: Player, x: number, y: number, animation: string) {
+    move(player: Player, x: number, y: number, animation: string, timestamp: number) {
         // Check if the player is in the world
         if (!this.onlinePlayers[player.id]) return;
 
@@ -99,9 +98,29 @@ export default class World {
             type: Strings.WS_MOVE,
             payload: {
                 player_id: player.id,
-                data: { x, y, animation }
-            }
+                data: { x, y, animation, timestamp }
+            },
         }));
+    }
+
+    // export the world data (For saving the world)
+    exportData(): WorldDataWithPlayers {
+        return {
+            id: this.id,
+            name: this.name,
+            onlinePlayers: this.getOnlinePlayers().map(p => p.exportData())
+        }
+    }
+
+    // create a world from data (For loading the world)
+    static createWorld(data: WorldDataWithPlayers) {
+        const world = new World({id: data.id, name: data.name});
+        
+        for (const player of data.onlinePlayers) {
+            world.addPlayer(new Player(player, null));
+        }
+
+        return world;
     }
 
 

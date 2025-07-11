@@ -55,6 +55,7 @@ export class Player extends Phaser.GameObjects.GameObject {
 
     // Update method for movement and animations
     update(socket: WebSocket | null) {
+
         if (!this.cursors) return;
 
         this.sprite.setVelocity(0);
@@ -93,7 +94,8 @@ export class Player extends Phaser.GameObjects.GameObject {
                     data: {
                         x: this.sprite.x,
                         y: this.sprite.y,
-                        animation
+                        animation,
+                        timestamp: Date.now()
                     }
                 }
             }));
@@ -115,6 +117,7 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
     public scene: Phaser.Scene;
     private playerData: PlayerData;
     private animationPrefix: string;
+    public lasttimestamp: number = 0;
 
     constructor(scene: Phaser.Scene, playerData: PlayerData) {
         super(scene, 'Player');
@@ -153,7 +156,11 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
         }
     }
 
-    update(animation: string | null, x: number, y: number) {
+    update(animation: string | null, x: number, y: number, timestamp: number) {
+        if (timestamp < this.lasttimestamp) return;
+
+        this.lasttimestamp = timestamp;
+
         this.sprite.x = x;
         this.sprite.y = y;
 
