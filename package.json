@@ -2,7 +2,7 @@
   "name": "gather_u",
   "scripts": {
     "dev": "cd client && npm run dev & cd server && npm run dev",
-    "dev_s2": "cd client && VITE_WS_URL=ws://localhost:5000 VITE_API_URL=http://localhost:5000 npm run dev --port 5174 & cd server && PORT=5000 npm run dev"
+    "dev_s2": "cd client && VITE_WS_URL=ws://localhost:5000 VITE_API_URL=http://localhost:5000 npm run dev & cd server && PORT=5000 npm run dev"
   },
   "version": "1.0.0",
   "main": "index.js",

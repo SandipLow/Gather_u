@@ -134,9 +134,10 @@ export default class CityScene extends Phaser.Scene {
     }
 
     update() {
-        // Clear overlay
+        // Clear overlay and overlay mask each frame
         this.overlay.clear();
         this.overlay.clearMask();
+        this.overlayMask.clear();
 
         const nears: OtherPlayer[] = [];
         let isAnyNear = false;
@@ -156,26 +157,26 @@ export default class CityScene extends Phaser.Scene {
         }
 
         if (isAnyNear) {
-            // Dark overlay over entire screen
+            // 1. Draw the dark overlay
             this.overlay.fillStyle(0x000000, 0.7);
             this.overlay.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height);
 
-            const mask = this.overlayMask.createGeometryMask();
-            mask.invertAlpha = true;
-
-            this.overlay.setMask(mask);
+            // 2. Draw spotlight holes BEFORE creating the mask
+            const cam = this.cameras.main;
 
             for (const otherPlayer of nears) {
-                const worldX = otherPlayer.position.x;
-                const worldY = otherPlayer.position.y;
-
-                const camera = this.cameras.main;
-                const camX = worldX - camera.worldView.x;
-                const camY = worldY - camera.worldView.y;
-
-                this.overlayMask.fillCircle(camX, camY, 50);
+                this.overlayMask.fillStyle(0xffffff, 1);
+                this.overlayMask.fillCircle(
+                    otherPlayer.position.x,
+                    otherPlayer.position.y, 
+                    50
+                );
             }
-        
+
+            // 3. Create and apply the inverted geometry mask
+            const mask = this.overlayMask.createGeometryMask();
+            mask.invertAlpha = true;
+            this.overlay.setMask(mask);
         }
 
     }
