@@ -1,2 +1,110 @@
-node_modules/
-dist/
+# Dependencies
+**/node_modules/
+**/*npm-debug.log*
+**/*yarn-debug.log*
+**/*yarn-error.log*
+**/*pnpm-debug.log*
+
+# Build outputs
+**/dist/
+**/build/
+**/.output/
+**/.vercel/
+**/.netlify/
+
+# Environment variables (anywhere in the project)
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# IDE and Editor files
+**/.vscode/
+**/.idea/
+**/*.swp
+**/*.swo
+**/*~
+
+# OS generated files
+**/.DS_Store
+**/.DS_Store?
+**/._*
+**/.Spotlight-V100
+**/.Trashes
+**/ehthumbs.db
+**/Thumbs.db
+
+# Logs
+**/logs/
+**/*.log
+
+# Runtime data
+**/pids/
+**/*.pid
+**/*.seed
+**/*.pid.lock
+
+# Coverage directory used by tools like istanbul
+**/coverage/
+**/*.lcov
+
+# nyc test coverage
+**/.nyc_output/
+
+# Dependency directories
+**/jspm_packages/
+
+# TypeScript cache
+**/*.tsbuildinfo
+
+# Optional npm cache directory
+**/.npm
+
+# Optional eslint cache
+**/.eslintcache
+
+# Optional REPL history
+**/.node_repl_history
+
+# Output of 'npm pack'
+**/*.tgz
+
+# Yarn Integrity file
+**/.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+**/.cache/
+**/.parcel-cache/
+
+# Vite build tool
+**/.vite/
+
+# Svelte kit
+**/.svelte-kit/
+
+# Redis dump files
+**/dump.rdb
+
+# Firebase
+**/.firebase/
+**/firebase-debug.log
+**/firestore-debug.log
+
+# Temporary files
+**/tmp/
+**/temp/
+
+# Database files
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+
+# Certificate files
+**/*.pem
+**/*.key
+**/*.crt
+
+# Backup files
+**/*.backup
+**/*.bak

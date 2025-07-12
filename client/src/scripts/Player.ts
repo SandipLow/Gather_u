@@ -113,11 +113,13 @@ export class Player extends Phaser.GameObjects.GameObject {
 }
 
 export class OtherPlayer extends Phaser.GameObjects.GameObject {
-    private sprite: Phaser.Physics.Arcade.Sprite;
+    private sprite?: Phaser.Physics.Arcade.Sprite;
     public scene: Phaser.Scene;
     private playerData: PlayerData;
     private animationPrefix: string;
     public lasttimestamp: number = 0;
+    public position: Phaser.Math.Vector2;
+
 
     constructor(scene: Phaser.Scene, playerData: PlayerData) {
         super(scene, 'Player');
@@ -131,8 +133,8 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
         // Create a unique prefix for animations based on player ID
         this.animationPrefix = this.playerData.id + '-';
 
-        // Create a sprite for the player with the chosen texture
-        this.sprite = scene.physics.add.sprite(playerData.checkpoint.x, playerData.checkpoint.y, playerData.spritesheet);
+        // Set the initial position based on the player's checkpoint
+        this.position = new Phaser.Math.Vector2(playerData.checkpoint.x, playerData.checkpoint.y);
 
         // Define animations
         this.createAnimations();
@@ -160,6 +162,9 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
         if (timestamp < this.lasttimestamp) return;
 
         this.lasttimestamp = timestamp;
+        this.position.set(x, y);
+
+        if (!this.sprite) return;
 
         this.sprite.x = x;
         this.sprite.y = y;
@@ -172,12 +177,44 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
         }
     }
 
-    getSprite() {
-        return this.sprite;
+    checkProximity(player: Player) {
+        const distance = Phaser.Math.Distance.Between(
+            this.position.x,
+            this.position.y,
+            player.getSprite().x,
+            player.getSprite().y
+        );
+
+        if (distance < 200) {
+            // If within proximity, ensure the sprite is loaded
+            this.#load();
+        }
+        else {
+            // If too far, unload the sprite
+            this.#unload();
+        }
+
+        return distance < 40;
     }
 
-    destroy() {
+    getName() {
+        return this.playerData.name;
+    }
+
+    #load() {
+        if (this.sprite) return;
+
+        this.sprite = this.scene.physics.add.sprite(
+            this.position.x, 
+            this.position.y, 
+            this.playerData.spritesheet
+        );
+    }
+
+    #unload() {
+        if (!this.sprite) return;
+
         this.sprite.destroy();
-        super.destroy();
+        this.sprite = undefined;
     }
 }

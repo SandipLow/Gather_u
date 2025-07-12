@@ -1,8 +1,6 @@
-import { fetchUserData } from "../lib/api";
+import { fetchUserData, login } from "../lib/api";
 
 export default class MainMenuScene extends Phaser.Scene {
-    private user_id: string | null = null;
-
     constructor() {
         super('MainMenuScene'); // Scene key
     }
@@ -21,14 +19,55 @@ export default class MainMenuScene extends Phaser.Scene {
             color: '#ffffff',
         }).setOrigin(0.5, 0);
 
-        // Prompt for user ID and fetch user data
-        this.user_id = localStorage.getItem("user_id")
-        if (!this.user_id) {
-            // render a text showing user not logged in
-            this.add.text(this.scale.width / 2, this.scale.height / 2, `User not logged in`, {
-                fontSize: '16px',
-                color: '#ffffff',
-            }).setOrigin(0.5, 0.5);
+        // Check for authentication
+        const auth = localStorage.getItem("auth");
+        if (!auth) {
+            // create elements
+            const emailInputElement = document.createElement('input');
+            emailInputElement.type = 'email';
+            emailInputElement.placeholder = 'Enter email';
+            emailInputElement.style = 'width: 280px; padding: 10px; font-size: 16px; background-color: #333333; color: #ffffff; border: none;';
+            
+            const passwordInputElement = document.createElement('input');
+            passwordInputElement.type = 'password';
+            passwordInputElement.placeholder = 'Enter password';
+            passwordInputElement.style = 'width: 280px; padding: 10px; font-size: 16px; background-color: #333333; color: #ffffff; border: none;';
+
+            const loginButtonElement = document.createElement('button');
+            loginButtonElement.textContent = 'Login';
+            loginButtonElement.style = 'width: 100px; padding: 10px; font-size: 16px; background-color: #00aaff; color: #ffffff; border: none; cursor: pointer;';
+
+
+            // Create login interface using native HTML input elements
+            const loginContainer = this.add.container(this.scale.width / 2, this.scale.height / 2);
+            const emailInput = this.add.dom(0, -50, emailInputElement).setOrigin(0.5);
+            const passwordInput = this.add.dom(0, 0, passwordInputElement).setOrigin(0.5);
+            const loginButton = this.add.dom(0, 50, loginButtonElement).setOrigin(0.5);
+
+            // Add elements to container
+            loginContainer.add([emailInput, passwordInput, loginButton]);
+
+            // Login button handling
+            loginButtonElement.addEventListener('click', async () => {
+                const email = (emailInputElement as HTMLInputElement).value;
+                const password = (passwordInputElement as HTMLInputElement).value;
+                try {
+                    await login(email, password);
+                    // Clean up DOM elements
+                    emailInputElement.remove();
+                    passwordInputElement.remove();
+                    loginButtonElement.remove();
+                    // Reload the scene after successful login
+                    this.scene.restart();
+                } catch (error) {
+                    // Display error message
+                    this.add.text(this.scale.width / 2, 300, 'Login failed. Please try again.', {
+                        fontSize: '16px',
+                        color: '#ff0000',
+                    }).setOrigin(0.5);
+                }
+            });
+
             return;
         }
 
@@ -67,20 +106,28 @@ export default class MainMenuScene extends Phaser.Scene {
 
             // Handle button click to enter the world
             selectButton.on('pointerdown', () => {
-                this.startWorld(player);
+                this.scene.start('CityScene', player);
             });
 
             yOffset += 50; // Adjust spacing between world options
         });
+
+        // Log out Button
+        const logoutButton = this.add.text(this.scale.width - 10, 50, 'Logout', {
+            fontSize: '16px',
+            color: '#ffffff',
+            backgroundColor: '#ff0000',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(1, 0);
+        logoutButton.setInteractive();
+
+        logoutButton.on('pointerdown', () => {
+            localStorage.removeItem("auth");
+            this.scene.restart(); // Reload the main menu scene
+        });
     }
 
-    // Start the selected world
-    startWorld(player: any) {
-        // Pass the world data to the CityScene
-        this.scene.start('CityScene', player);
-    }
-
-    // Update loop (for animations or other real-time logic)
+    // Update loop (for animations or real-time logic)
     update(time: number, delta: number): void {
         // Add any animations or background updates here if needed
     }

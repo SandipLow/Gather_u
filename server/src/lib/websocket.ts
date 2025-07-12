@@ -1,10 +1,10 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { Player, World } from './models';
-import Strings from './res/strings';
-import db from './db';
+import Strings from '../res/strings';
 import http from 'http';
 import Redis from 'ioredis';
 import { v4 as uuidv4 } from 'uuid';
+import Player from '../models/Player';
+import World from '../models/World';
 
 export default class SocketServer {
     serverid: string = "";
@@ -140,20 +140,25 @@ export default class SocketServer {
     }
 
     // Handle player entering the world
-    handleEnterWorld(payload: any, ws: WebSocket | null) {
+    async handleEnterWorld(payload: any, ws: WebSocket | null) {
         const { player_id } = payload;
 
         // Is the player already playing?
         if (this.players[player_id]) return;
 
-        const playerData = db.Players[player_id];
+        const playerData = await Player.get(player_id);
         if (!playerData) return;
 
         const player = new Player(playerData, ws);
         this.players[player_id] = player;
 
-        const world = this.worlds[player.world_id] || new World(db.Worlds[player.world_id]);
-        this.worlds[world.id] = world;
+        let world = this.worlds[player.world_id];
+        if (!world) {
+            const worldInstance = await World.get(player.world_id);
+            if (!worldInstance) return;
+            world = worldInstance;
+            this.worlds[world.id] = world;
+        }
 
         world.addPlayer(player);
 

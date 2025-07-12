@@ -9,6 +9,8 @@ export default class CityScene extends Phaser.Scene {
     private map: Phaser.Tilemaps.Tilemap | null = null;
     private socket: WebSocket | null = null;
     private playerData: any;
+    private overlay!: Phaser.GameObjects.Graphics;
+    private overlayMask!: Phaser.GameObjects.Graphics;
 
     constructor() {
         super('CityScene');
@@ -16,10 +18,6 @@ export default class CityScene extends Phaser.Scene {
 
     init(playerData: any) {
         this.playerData = playerData;
-    }
-
-    addOtherPlayer(playerData: any) {
-        this.otherPlayers[playerData.id] = new OtherPlayer(this, playerData);
     }
 
     preload() {
@@ -55,7 +53,7 @@ export default class CityScene extends Phaser.Scene {
 
         houses.setCollisionByProperty({ collides: true });
         trees.setCollisionByProperty({ collides: true });
-        
+
 
         // Connect to the server
         this.socket = connectToWebSocket();
@@ -71,7 +69,7 @@ export default class CityScene extends Phaser.Scene {
 
         this.socket.onmessage = (event) => {
             const { type, payload } = JSON.parse(event.data.toString());
-            
+
             // Listen for player enter world events
             if (type === 'enter_world') {
                 console.log('Player entered world:', payload);
@@ -125,14 +123,65 @@ export default class CityScene extends Phaser.Scene {
             }
         });
 
+        // overlay
+        this.overlay = this.add.graphics();
+        this.overlay.setDepth(1000);  // Ensure it's above everything
+        this.overlay.setScrollFactor(0);  // Lock to screen
+
+        this.overlayMask = this.add.graphics();
+        this.overlayMask.setVisible(false);
+
     }
 
     update() {
-        // Update player logic
+        // Clear overlay
+        this.overlay.clear();
+        this.overlay.clearMask();
+
+        const nears: OtherPlayer[] = [];
+        let isAnyNear = false;
+
         if (this.player) {
             this.player.update(this.socket);
+
+            for (const playerId in this.otherPlayers) {
+                const otherPlayer = this.otherPlayers[playerId];
+                const isNear = otherPlayer.checkProximity(this.player);
+
+                if (isNear) {
+                    nears.push(otherPlayer);
+                    isAnyNear = true;
+                }
+            }
         }
+
+        if (isAnyNear) {
+            // Dark overlay over entire screen
+            this.overlay.fillStyle(0x000000, 0.7);
+            this.overlay.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height);
+
+            const mask = this.overlayMask.createGeometryMask();
+            mask.invertAlpha = true;
+
+            this.overlay.setMask(mask);
+
+            for (const otherPlayer of nears) {
+                const worldX = otherPlayer.position.x;
+                const worldY = otherPlayer.position.y;
+
+                const camera = this.cameras.main;
+                const camX = worldX - camera.worldView.x;
+                const camY = worldY - camera.worldView.y;
+
+                this.overlayMask.fillCircle(camX, camY, 50);
+            }
         
+        }
+
+    }
+
+    addOtherPlayer(playerData: any) {
+        this.otherPlayers[playerData.id] = new OtherPlayer(this, playerData);
     }
 }
 

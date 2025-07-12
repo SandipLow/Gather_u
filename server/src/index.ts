@@ -1,12 +1,12 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import cors from "cors";
 import express from "express";
-import db from "./db";
-import User from "./models/User";
+import userRouter from "./routes/user";
 import { createServer } from "http";
-import SocketServer from "./websocket";
-import dotenv from "dotenv";
+import SocketServer from "./lib/websocket";
 
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,20 +21,7 @@ app.get("/", (req, res) => {
     res.send("Hello World");
 });
 
-app.get("/user/:id", (req, res) => {
-    const user_id = req.params.id;
-    const userDbData = db.Users[user_id];
-
-    if (!userDbData) {
-        res.status(404).send("User not found");
-        return;
-    }
-
-    const user = new User(userDbData);
-    const userData = user.getData();
-
-    res.send(userData);
-});
+app.use("/user", userRouter)
 
 // Create and configure the WebSocket server
 const socket = new SocketServer(server);

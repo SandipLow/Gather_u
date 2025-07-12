@@ -8,18 +8,19 @@
 
     onMount(() => {
         // Define the Phaser game configuration
-        const config = {
+        const config: Phaser.Types.Core.GameConfig = {
             type: Phaser.AUTO,
             parent: "game-container",
+            dom: {
+                createContainer: true
+            },
             pixelArt: true,
             scene: [MainMenuScene, CityScene],
-            width: 320,
-            height: 240,
+            width: 800,
+            height: 600,
             scale: {
                 mode: Phaser.Scale.FIT,
-                autoCenter: Phaser.Scale.CENTER_BOTH,
-                width: 800,
-                height: 600,
+                autoCenter: Phaser.Scale.CENTER_HORIZONTALLY,
             },
             physics: {
                 default: "arcade",
@@ -49,14 +50,12 @@
 <!-- Style the game container if needed -->
 <style>
     .container {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        width: 100vw;
+        height: 100vh;
     }
     #game-container {
         width: 100%;
         height: 100%;
+        position: relative;
     }
 </style>

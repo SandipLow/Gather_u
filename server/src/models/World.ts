@@ -1,4 +1,5 @@
-import db from "../db";
+import { collection, getDocs, where, query, addDoc, doc, getDoc, updateDoc } from "firebase/firestore";
+import db from "../lib/db";
 import Strings from "../res/strings";
 import Player from "./Player";
 
@@ -18,10 +19,16 @@ export default class World {
     }
 
     // Get all players in the world
-    getPlayers() {
+    async getPlayers() {
         // simulate a database query : "SELECT * FROM Players WHERE worldId = this.id"
-        return Object.values(db.Players)
-                .filter(player => player.world_id === this.id)
+        const res = await getDocs(query(
+            collection(db, Strings.PLAYERS_COLLECTION),
+            where("world_id", "==", this.id)
+        ))
+
+        return res.docs.map(doc => {
+            return {id: doc.id, ...doc.data()} as PlayerData;
+        });
     }
 
     // Get all online players in the world
@@ -39,7 +46,7 @@ export default class World {
         // Check if the player is already in the world
         if (this.onlinePlayers[player.id]) return;
         // Check if the player belongs to the world
-        if (db.Players[player.id].world_id !== this.id) return;
+        if (player.world_id !== this.id) return;
 
         this.onlinePlayers[player.id] = player;
         this.emit(player, JSON.stringify({
@@ -121,6 +128,35 @@ export default class World {
         }
 
         return world;
+    }
+
+
+    // database operations
+    static async create(worldData: Omit<WorldData, "id">) {
+        const res = await addDoc(collection(db, Strings.WORLDS_COLLECTION), worldData);
+        return new World({id: res.id, ...worldData});
+    }
+
+    static async getAll() {
+        const res = await getDocs(collection(db, Strings.WORLDS_COLLECTION));
+        return res.docs.map(doc => {
+            return {id: doc.id, ...doc.data()} as WorldData;
+        });
+    }
+
+    static async get(id: string) {
+        const res = await getDoc(doc(db, Strings.WORLDS_COLLECTION, id));
+        if (!res.exists()) return null;
+
+        const worldData = {id: res.id, ...res.data()} as WorldData;
+        return new World(worldData);
+    }
+
+    static async update(id: string, worldData: Partial<Omit<WorldData, "id">>) {
+        const res = await getDoc(doc(db, Strings.WORLDS_COLLECTION, id));
+        if (!res.exists()) return null;
+
+        await updateDoc(doc(db, Strings.WORLDS_COLLECTION, id), worldData);
     }
 
 
