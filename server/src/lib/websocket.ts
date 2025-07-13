@@ -47,8 +47,6 @@ export default class SocketServer {
             host: redisUrl.split(':')[0]
         });
 
-        // fetch current world and players 
-
         // Subscribe to relevant Redis channels
         this.redisSub.subscribe('world-events', (err, count) => {
             if (err) {
@@ -58,6 +56,40 @@ export default class SocketServer {
             console.log(`Subscribed successfully! This client is currently subscribed to ${count} channels.`);
         });
         this.redisSub.on('message', this.onRedisMessage.bind(this));
+
+
+        // clean up Redis connections on exit
+        process.on('exit', () => {
+            this.redisPub.quit();
+            this.redisSub.quit();
+        });
+
+        // Handle WebSocket errors
+        this.wss.on("error", (error) => {
+            console.error("WebSocket error:", error);
+        });
+
+        // Handle Redis errors
+        this.redisPub.on('error', (error) => {
+            console.error("Redis Pub error:", error);
+        });
+        this.redisSub.on('error', (error) => {
+            console.error("Redis Sub error:", error);
+        });
+
+
+        // periodically clean up disconnected players
+        setInterval(() => {
+            for (const player_id in this.players) {
+                const player = this.players[player_id];
+                // If the player's socket is not open, remove them from the world
+                if (!player.socket || player.socket.readyState !== WebSocket.OPEN) {
+                    this.handleLeaveWorld({ player_id });
+                    // Publish leave event to Redis
+                    this.redisPub.publish('world-events', JSON.stringify({ type: Strings.WS_LEAVE_WORLD, payload: { player_id }, serverid: this.serverid }));
+                }
+            }
+        }, 10000); // every 10 seconds
     }
 
     onConnection(ws: WebSocket) {

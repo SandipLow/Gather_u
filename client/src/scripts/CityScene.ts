@@ -90,6 +90,7 @@ export default class CityScene extends Phaser.Scene {
                 const { player_id } = payload;
                 if (this.otherPlayers[player_id]) {
                     this.otherPlayers[player_id].destroy();
+                    this.nears.delete(this.otherPlayers[player_id]);
                     delete this.otherPlayers[player_id];
                 }
             }
@@ -100,6 +101,17 @@ export default class CityScene extends Phaser.Scene {
                     this.otherPlayers[from].showChatMessage(message);
                 }
             }
+        }
+
+        // reconnect on close
+        this.socket.onclose = () => {
+            console.log('Disconnected from server, attempting to reconnect...');
+            setTimeout(() => {
+                this.socket = connectToWebSocket();
+                this.socket.onopen = this.socket.onopen;
+                this.socket.onmessage = this.socket.onmessage;
+                this.socket.onclose = this.socket.onclose;
+            }, 1000);
         }
 
         // Create player
@@ -132,7 +144,7 @@ export default class CityScene extends Phaser.Scene {
 
         // overlay
         this.overlay = this.add.graphics();
-        this.overlay.setDepth(1000);  // Ensure it's above everything
+        this.overlay.setDepth(100);  // Ensure it's above everything
         this.overlay.setScrollFactor(0);  // Lock to screen
 
         this.overlayMask = this.add.graphics();

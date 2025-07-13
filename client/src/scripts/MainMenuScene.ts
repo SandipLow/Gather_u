@@ -113,7 +113,7 @@ export default class MainMenuScene extends Phaser.Scene {
         });
 
         // Log out Button
-        const logoutButton = this.add.text(this.scale.width - 10, 50, 'Logout', {
+        const logoutButton = this.add.text(this.scale.width - 50, 50, 'Logout', {
             fontSize: '16px',
             color: '#ffffff',
             backgroundColor: '#ff0000',

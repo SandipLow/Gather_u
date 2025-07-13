@@ -11,16 +11,14 @@
         const config: Phaser.Types.Core.GameConfig = {
             type: Phaser.AUTO,
             parent: "game-container",
+            fullscreenTarget: "game-container",
             dom: {
                 createContainer: true
             },
             pixelArt: true,
             scene: [MainMenuScene, CityScene],
-            width: 800,
-            height: 600,
             scale: {
-                mode: Phaser.Scale.FIT,
-                autoCenter: Phaser.Scale.CENTER_HORIZONTALLY,
+                mode: Phaser.Scale.RESIZE
             },
             physics: {
                 default: "arcade",
@@ -56,6 +54,5 @@
     #game-container {
         width: 100%;
         height: 100%;
-        position: relative;
     }
 </style>

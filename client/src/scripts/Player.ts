@@ -5,6 +5,7 @@ export class Player extends Phaser.GameObjects.GameObject {
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null;
     public scene: Phaser.Scene;
     private playerData: PlayerData;
+    private animation: string | null = null;
     private animationPrefix: string;
     private chatInput: Phaser.GameObjects.DOMElement;
 
@@ -72,6 +73,48 @@ export class Player extends Phaser.GameObjects.GameObject {
         this.chatInput.setOrigin(0.5);
         this.chatInput.setScrollFactor(0);
         this.chatInput.setVisible(false);
+
+        // Make UI controls for mobile
+        const size = 10;
+        const margin = 10;
+        const baseX = this.scene.cameras.main.centerX - this.scene.scale.width/4 + 0.25*this.scene.scale.width/4;
+        const baseY = this.scene.cameras.main.centerY;
+        const buttonStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+            fontSize: '10px',
+            color: '#ffffff',
+            backgroundColor: 'rgba(51, 51, 51, 0.6)',
+            padding: { x: 6, y: 6 },
+            align: 'center'
+        };
+
+        // Create buttons
+        const leftButton = this.scene.add.text(baseX - size - margin, baseY, '◀', buttonStyle).setInteractive();
+        const rightButton = this.scene.add.text(baseX + size + margin, baseY, '▶', buttonStyle).setInteractive();
+        const upButton = this.scene.add.text(baseX, baseY - size - margin, '▲', buttonStyle).setInteractive();
+        const downButton = this.scene.add.text(baseX, baseY + size + margin, '▼', buttonStyle).setInteractive();
+
+        [leftButton, rightButton, upButton, downButton].forEach(btn => {
+            btn.setOrigin(0.5);
+            btn.setScrollFactor(0);
+            btn.setDepth(1000);
+        });
+
+        // Touch/hold handling
+        leftButton.on('pointerdown', () => this.cursors ? this.cursors.left.isDown = true : null);
+        leftButton.on('pointerup', () => this.cursors ? this.cursors.left.isDown = false : null);
+        leftButton.on('pointerout', () => this.cursors ? this.cursors.left.isDown = false : null);
+
+        rightButton.on('pointerdown', () => this.cursors ? this.cursors.right.isDown = true : null);
+        rightButton.on('pointerup', () => this.cursors ? this.cursors.right.isDown = false : null);
+        rightButton.on('pointerout', () => this.cursors ? this.cursors.right.isDown = false : null);
+
+        upButton.on('pointerdown', () => this.cursors ? this.cursors.up.isDown = true : null);
+        upButton.on('pointerup', () => this.cursors ? this.cursors.up.isDown = false : null);
+        upButton.on('pointerout', () => this.cursors ? this.cursors.up.isDown = false : null);
+
+        downButton.on('pointerdown', () => this.cursors ? this.cursors.down.isDown = true : null);
+        downButton.on('pointerup', () => this.cursors ? this.cursors.down.isDown = false : null);
+        downButton.on('pointerout', () => this.cursors ? this.cursors.down.isDown = false : null);
     }
 
     // Dynamically create animations for the chosen sprite
@@ -92,34 +135,35 @@ export class Player extends Phaser.GameObjects.GameObject {
     // Update method for movement and animations
     update(socket: WebSocket | null) {
 
-        if (!this.cursors) return;
-
         this.sprite.setVelocity(0);
-        let animation = null;
 
-        if (this.cursors.left.isDown) {
-            this.sprite.setVelocityX(-100);
-            this.sprite.anims.play(this.animationPrefix + 'walk-left', true);
-            animation = 'walk-left';
-        }
-        else if (this.cursors.right.isDown) {
-            this.sprite.setVelocityX(100);
-            this.sprite.anims.play(this.animationPrefix + 'walk-right', true);
-            animation = 'walk-right';
-        }
-        else if (this.cursors.up.isDown) {
-            this.sprite.setVelocityY(-100);
-            this.sprite.anims.play(this.animationPrefix + 'walk-up', true);
-            animation = 'walk-up';
-        }
-        else if (this.cursors.down.isDown) {
-            this.sprite.setVelocityY(100);
-            this.sprite.anims.play(this.animationPrefix + 'walk-down', true);
-            animation = 'walk-down';
-        }
-        else {
-            this.sprite.anims.stop();
-        }
+        if (this.cursors) {
+            if (this.cursors.left.isDown) {
+                this.sprite.setVelocityX(-100);
+                this.sprite.anims.play(this.animationPrefix + 'walk-left', true);
+                this.animation = 'walk-left';
+            }
+            else if (this.cursors.right.isDown) {
+                this.sprite.setVelocityX(100);
+                this.sprite.anims.play(this.animationPrefix + 'walk-right', true);
+                this.animation = 'walk-right';
+            }
+            else if (this.cursors.up.isDown) {
+                this.sprite.setVelocityY(-100);
+                this.sprite.anims.play(this.animationPrefix + 'walk-up', true);
+                this.animation = 'walk-up';
+            }
+            else if (this.cursors.down.isDown) {
+                this.sprite.setVelocityY(100);
+                this.sprite.anims.play(this.animationPrefix + 'walk-down', true);
+                this.animation = 'walk-down';
+            }
+            else {
+                this.sprite.anims.stop();
+                this.animation = null;
+            }
+        };
+
 
         // Send the new position to the server
         if (socket && socket.readyState === WebSocket.OPEN) {
@@ -130,7 +174,7 @@ export class Player extends Phaser.GameObjects.GameObject {
                     data: {
                         x: this.sprite.x,
                         y: this.sprite.y,
-                        animation,
+                        animation: this.animation?? null,
                         timestamp: Date.now()
                     }
                 }
@@ -181,6 +225,9 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
 
         // Set the initial position based on the player's checkpoint
         this.position = new Phaser.Math.Vector2(playerData.checkpoint.x, playerData.checkpoint.y);
+
+        // load the player sprite
+        this.#load();
 
         // Define animations
         this.createAnimations();
@@ -255,10 +302,11 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
             color: '#fff',
             backgroundColor: '#000',
             padding: { x: 5, y: 2 },
-            align: 'center'
+            align: 'center',
         });
 
         chatBubble.setOrigin(0.5);
+        chatBubble.setDepth(1000)
         this.scene.time.delayedCall(3000, () => {
             chatBubble.destroy();
         });
