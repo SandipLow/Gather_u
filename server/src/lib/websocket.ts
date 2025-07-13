@@ -72,8 +72,6 @@ export default class SocketServer {
 
         // Ignore messages from this server
         if (serverid === this.serverid) return;
-        
-        console.log('Received message from Redis:', message);
 
         switch (type) {
             case Strings.WS_ENTER_WORLD:
@@ -87,6 +85,10 @@ export default class SocketServer {
 
             case Strings.WS_MOVE:
                 this.handleMove(payload);
+                break;
+
+            case Strings.WS_TALK:
+                this.handleTalk(payload);
                 break;
 
             default:
@@ -118,6 +120,12 @@ export default class SocketServer {
                     this.redisPub.publish('world-events', JSON.stringify({ type, payload, serverid: this.serverid }));
                     break;
 
+                case Strings.WS_TALK:
+                    this.handleTalk(payload);
+                    // Publish talk event to Redis
+                    this.redisPub.publish('world-events', JSON.stringify({ type, payload, serverid: this.serverid }));
+                    break;
+
                 default:
                     console.error('Unknown message type:', type);
                     break;
@@ -127,15 +135,23 @@ export default class SocketServer {
         }
     }
 
-    onClose(ws: WebSocket) {
+    // Helper function to get player by WebSocket - TODO: This can be optimized
+    #getPlayerBySocket(ws: WebSocket): Player | null {
         for (const player_id in this.players) {
             const player = this.players[player_id];
             if (player.socket === ws) {
-                this.handleLeaveWorld({ player_id });
-                // Publish leave event to Redis
-                this.redisPub.publish('world-events', JSON.stringify({ type: Strings.WS_LEAVE_WORLD, payload: { player_id } }));
-                break;
+                return player;
             }
+        }
+        return null;
+    }
+
+    onClose(ws: WebSocket) {
+        const player = this.#getPlayerBySocket(ws);
+        if (player) {
+            this.handleLeaveWorld({ player_id: player.id });
+            // Publish leave event to Redis
+            this.redisPub.publish('world-events', JSON.stringify({ type: Strings.WS_LEAVE_WORLD, payload: { player_id: player.id }, serverid: this.serverid }));
         }
     }
 
@@ -210,5 +226,22 @@ export default class SocketServer {
         if (!world) return;
 
         world.move(player, x, y, animation, timestamp);
+    }
+
+    // handle talk event
+    handleTalk(payload: any) {
+        const { from, players, message } = payload;
+
+        if (!Array.isArray(players) || players.length === 0) return;
+
+        for (const player_id of players) {
+            const player = this.players[player_id];
+            if (player && player.socket && player.socket.readyState === WebSocket.OPEN) {
+                player.socket.send(JSON.stringify({
+                    type: Strings.WS_TALK,
+                    payload: { from, message }
+                }));
+            }
+        }
     }
 }

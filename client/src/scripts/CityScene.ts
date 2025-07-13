@@ -8,15 +8,16 @@ export default class CityScene extends Phaser.Scene {
     private otherPlayers: { [key: string]: OtherPlayer } = {};
     private map: Phaser.Tilemaps.Tilemap | null = null;
     private socket: WebSocket | null = null;
-    private playerData: any;
+    private playerData!: PlayerData;
     private overlay!: Phaser.GameObjects.Graphics;
     private overlayMask!: Phaser.GameObjects.Graphics;
+    private nears: Set<OtherPlayer> = new Set();
 
     constructor() {
         super('CityScene');
     }
 
-    init(playerData: any) {
+    init(playerData: PlayerData) {
         this.playerData = playerData;
     }
 
@@ -72,7 +73,6 @@ export default class CityScene extends Phaser.Scene {
 
             // Listen for player enter world events
             if (type === 'enter_world') {
-                console.log('Player entered world:', payload);
                 const { player } = payload;
                 this.addOtherPlayer(player);
             }
@@ -93,10 +93,17 @@ export default class CityScene extends Phaser.Scene {
                     delete this.otherPlayers[player_id];
                 }
             }
+
+            else if (type === 'talk') {
+                const { from, message } = payload;
+                if (this.otherPlayers[from]) {
+                    this.otherPlayers[from].showChatMessage(message);
+                }
+            }
         }
 
         // Create player
-        this.player = new Player(this, this.playerData);
+        this.player = new Player(this, this.playerData, this.handleMessage.bind(this));
 
         // Set camera to follow player
         this.cameras.main.startFollow(this.player.getSprite());
@@ -139,9 +146,6 @@ export default class CityScene extends Phaser.Scene {
         this.overlay.clearMask();
         this.overlayMask.clear();
 
-        const nears: OtherPlayer[] = [];
-        let isAnyNear = false;
-
         if (this.player) {
             this.player.update(this.socket);
 
@@ -150,39 +154,51 @@ export default class CityScene extends Phaser.Scene {
                 const isNear = otherPlayer.checkProximity(this.player);
 
                 if (isNear) {
-                    nears.push(otherPlayer);
-                    isAnyNear = true;
+                    this.nears.add(otherPlayer);
+                }
+                else {
+                    this.nears.delete(otherPlayer);
                 }
             }
         }
 
-        if (isAnyNear) {
-            // 1. Draw the dark overlay
+        if (this.nears.size > 0) {
             this.overlay.fillStyle(0x000000, 0.7);
             this.overlay.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height);
 
-            // 2. Draw spotlight holes BEFORE creating the mask
-            const cam = this.cameras.main;
-
-            for (const otherPlayer of nears) {
+            for (const otherPlayer of this.nears) {
                 this.overlayMask.fillStyle(0xffffff, 1);
                 this.overlayMask.fillCircle(
                     otherPlayer.position.x,
-                    otherPlayer.position.y, 
+                    otherPlayer.position.y,
                     50
                 );
             }
 
-            // 3. Create and apply the inverted geometry mask
             const mask = this.overlayMask.createGeometryMask();
             mask.invertAlpha = true;
             this.overlay.setMask(mask);
+
+            this.player?.renderChatInput();
+        }
+
+        else {
+            this.player?.hideChatInput();
         }
 
     }
 
     addOtherPlayer(playerData: any) {
         this.otherPlayers[playerData.id] = new OtherPlayer(this, playerData);
+    }
+
+    handleMessage(msg: string) {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: 'talk',
+                payload: { from: this.playerData.id, players: Array.from(this.nears).map(plr=> plr.getPlayerData().id), message: msg }
+            }));
+        }
     }
 }
 

@@ -1,21 +1,14 @@
 import { sprites } from "./assets";
 
-interface PlayerData {
-    id: string;
-    name: string;
-    wealth: number;
-    checkpoint: { x: number, y: number };
-    spritesheet: string;
-}
-
 export class Player extends Phaser.GameObjects.GameObject {
     private sprite: Phaser.Physics.Arcade.Sprite;
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null;
     public scene: Phaser.Scene;
     private playerData: PlayerData;
     private animationPrefix: string;
+    private chatInput: Phaser.GameObjects.DOMElement;
 
-    constructor(scene: Phaser.Scene, playerData: PlayerData) {
+    constructor(scene: Phaser.Scene, playerData: PlayerData, handleSendMessage: (message: string) => void) {
         super(scene, 'Player');
 
         // Store the scene and player data
@@ -36,6 +29,49 @@ export class Player extends Phaser.GameObjects.GameObject {
 
         // Add player sprite to the scene
         scene.add.existing(this);
+
+        // chat input
+        const chatInput = document.createElement('input');
+        chatInput.type = 'text';
+        chatInput.placeholder = 'Type a message...';
+        chatInput.style.width = '100px';
+        chatInput.style.fontSize = '10px';
+        chatInput.style.zIndex = '1000';
+        chatInput.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+        chatInput.style.border = '1px solid #000';
+        chatInput.style.padding = '5px';
+
+        // Listen for focus on the chat input field
+        chatInput.addEventListener('focus', () => {
+            if (this.scene.game.input.keyboard) {
+                this.scene.game.input.keyboard.enabled = false; // Disable Phaser's keyboard input
+            }
+        });
+
+        // Listen for blur (when the input field loses focus)
+        chatInput.addEventListener('blur', () => {
+            if (this.scene.game.input.keyboard) {
+                this.scene.game.input.keyboard.enabled = true; // Re-enable Phaser's keyboard input
+            }
+        });
+
+        // Listen for Enter key to send the message
+        chatInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent form submission
+                const message = chatInput.value.trim();
+                if (message) {
+                    handleSendMessage(message);
+                    chatInput.value = '';
+                    chatInput.blur();
+                }
+            }
+        });
+
+        this.chatInput = this.scene.add.dom(this.scene.cameras.main.centerX, this.scene.cameras.main.centerY + 120, chatInput);
+        this.chatInput.setOrigin(0.5);
+        this.chatInput.setScrollFactor(0);
+        this.chatInput.setVisible(false);
     }
 
     // Dynamically create animations for the chosen sprite
@@ -104,6 +140,16 @@ export class Player extends Phaser.GameObjects.GameObject {
 
     getSprite() {
         return this.sprite;
+    }
+
+    renderChatInput() {
+        if (this.chatInput.visible) return;
+        this.chatInput.setVisible(true);
+    }
+
+    hideChatInput() {
+        if (!this.chatInput.visible) return;
+        this.chatInput.setVisible(false);
     }
 
     destroy() {
@@ -185,7 +231,7 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
             player.getSprite().y
         );
 
-        if (distance < 200) {
+        if (distance < 240) {
             // If within proximity, ensure the sprite is loaded
             this.#load();
         }
@@ -197,16 +243,38 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
         return distance < 40;
     }
 
-    getName() {
-        return this.playerData.name;
+    getPlayerData() {
+        return this.playerData;
+    }
+
+    showChatMessage(message: string) {
+        if (!this.sprite) return;
+
+        const chatBubble = this.scene.add.text(this.sprite.x, this.sprite.y - 20, message, {
+            fontSize: '12px',
+            color: '#fff',
+            backgroundColor: '#000',
+            padding: { x: 5, y: 2 },
+            align: 'center'
+        });
+
+        chatBubble.setOrigin(0.5);
+        this.scene.time.delayedCall(3000, () => {
+            chatBubble.destroy();
+        });
+    }
+
+    destroy() {
+        this.#unload();
+        super.destroy();
     }
 
     #load() {
         if (this.sprite) return;
 
         this.sprite = this.scene.physics.add.sprite(
-            this.position.x, 
-            this.position.y, 
+            this.position.x,
+            this.position.y,
             this.playerData.spritesheet
         );
     }

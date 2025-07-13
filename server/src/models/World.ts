@@ -81,10 +81,11 @@ export default class World {
     // emit a message to all players in the world except the player
     emit(player: Player, message: string) {
         for (const player_id in this.onlinePlayers) {
-            const p = this.onlinePlayers[player_id];
-            if (p.id === player.id) continue;
+            const otherPlayer = this.onlinePlayers[player_id];
+            // skip the player who sent the message
+            if (otherPlayer.id === player.id) continue;
 
-            p.send(message);
+            otherPlayer.send(message);
         };
     }
     

@@ -83,6 +83,13 @@ export default class Player {
         }
     }
 
+    // get distance from another player
+    getDistance(x: number, y: number) {
+        const dx = this.checkpoint.x - x;
+        const dy = this.checkpoint.y - y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
 
     // database operations
     static async create(playerData: Omit<PlayerData, "id">) {
