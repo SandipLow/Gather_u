@@ -1,134 +1,151 @@
 import { fetchUserData, login } from "../lib/api";
 
 export default class MainMenuScene extends Phaser.Scene {
+    private loginContainer?: Phaser.GameObjects.Container;
+    private elementsToUpdateOnResize: (() => void)[] = [];
+
     constructor() {
-        super('MainMenuScene'); // Scene key
+        super('MainMenuScene');
     }
 
     async create() {
-        // Set a solid color background
-        this.cameras.main.setBackgroundColor('#222222');
+        this.cameras.main.setBackgroundColor('#222');
 
-        this.add.text(this.scale.width / 2, 50, 'Welcome to the GATHER U', {
+        const title = this.add.text(this.scale.width / 2, 40, 'Welcome to the GATHER U', {
             fontSize: '32px',
             color: '#ffffff',
         }).setOrigin(0.5, 0);
 
-        this.add.text(this.scale.width / 2, 200, 'Main Menu', {
+        const subtitle = this.add.text(this.scale.width / 2, 100, 'Main Menu', {
             fontSize: '16px',
-            color: '#ffffff',
+            color: '#cccccc',
         }).setOrigin(0.5, 0);
 
-        // Check for authentication
+        // Reposition on resize
+        this.scale.on('resize', this.handleResize, this);
+        this.elementsToUpdateOnResize.push(() => {
+            title.setPosition(this.scale.width / 2, 40);
+            subtitle.setPosition(this.scale.width / 2, 100);
+        });
+
         const auth = localStorage.getItem("auth");
         if (!auth) {
-            // create elements
-            const emailInputElement = document.createElement('input');
-            emailInputElement.type = 'email';
-            emailInputElement.placeholder = 'Enter email';
-            emailInputElement.style = 'width: 280px; padding: 10px; font-size: 16px; background-color: #333333; color: #ffffff; border: none;';
-            
-            const passwordInputElement = document.createElement('input');
-            passwordInputElement.type = 'password';
-            passwordInputElement.placeholder = 'Enter password';
-            passwordInputElement.style = 'width: 280px; padding: 10px; font-size: 16px; background-color: #333333; color: #ffffff; border: none;';
-
-            const loginButtonElement = document.createElement('button');
-            loginButtonElement.textContent = 'Login';
-            loginButtonElement.style = 'width: 100px; padding: 10px; font-size: 16px; background-color: #00aaff; color: #ffffff; border: none; cursor: pointer;';
-
-
-            // Create login interface using native HTML input elements
-            const loginContainer = this.add.container(this.scale.width / 2, this.scale.height / 2);
-            const emailInput = this.add.dom(0, -50, emailInputElement).setOrigin(0.5);
-            const passwordInput = this.add.dom(0, 0, passwordInputElement).setOrigin(0.5);
-            const loginButton = this.add.dom(0, 50, loginButtonElement).setOrigin(0.5);
-
-            // Add elements to container
-            loginContainer.add([emailInput, passwordInput, loginButton]);
-
-            // Login button handling
-            loginButtonElement.addEventListener('click', async () => {
-                const email = (emailInputElement as HTMLInputElement).value;
-                const password = (passwordInputElement as HTMLInputElement).value;
-                try {
-                    await login(email, password);
-                    // Clean up DOM elements
-                    emailInputElement.remove();
-                    passwordInputElement.remove();
-                    loginButtonElement.remove();
-                    // Reload the scene after successful login
-                    this.scene.restart();
-                } catch (error) {
-                    // Display error message
-                    this.add.text(this.scale.width / 2, 300, 'Login failed. Please try again.', {
-                        fontSize: '16px',
-                        color: '#ff0000',
-                    }).setOrigin(0.5);
-                }
-            });
-
+            this.showLoginUI();
             return;
         }
 
         const userData = await fetchUserData();
+        this.showWorldSelection(userData.players);
+    }
 
-        // Extract worlds (formerly 'players') from user data
-        const { players } = userData;
+    private showLoginUI() {
+        const centerX = this.scale.width / 2;
+        const centerY = this.scale.height / 2;
 
-        // Display title and instructions
-        this.add.text(this.scale.width / 2, 250, `Select a World to Enter`, {
-            fontSize: '16px',
+        const emailInput = document.createElement('input');
+        emailInput.type = 'email';
+        emailInput.placeholder = 'Enter email';
+        emailInput.style.cssText = 'width: 280px; padding: 10px; font-size: 16px; background: #333; color: #fff; border: none;';
+
+        const passwordInput = document.createElement('input');
+        passwordInput.type = 'password';
+        passwordInput.placeholder = 'Enter password';
+        passwordInput.style.cssText = 'width: 280px; padding: 10px; font-size: 16px; background: #333; color: #fff; border: none;';
+
+        const loginButton = document.createElement('button');
+        loginButton.textContent = 'Login';
+        loginButton.style.cssText = 'width: 120px; padding: 10px; font-size: 16px; background: #00aaff; color: white; border: none; cursor: pointer;';
+
+        const emailDom = this.add.dom(0, -60, emailInput).setOrigin(0.5);
+        const passwordDom = this.add.dom(0, 0, passwordInput).setOrigin(0.5);
+        const buttonDom = this.add.dom(0, 60, loginButton).setOrigin(0.5);
+
+        this.loginContainer = this.add.container(centerX, centerY, [emailDom, passwordDom, buttonDom]);
+
+        loginButton.addEventListener('click', async () => {
+            const email = emailInput.value.trim();
+            const password = passwordInput.value.trim();
+            try {
+                await login(email, password);
+                emailInput.remove();
+                passwordInput.remove();
+                loginButton.remove();
+                this.scene.restart();
+            } catch (err) {
+                this.add.text(this.scale.width / 2, centerY + 120, 'Login failed. Try again.', {
+                    fontSize: '16px',
+                    color: '#ff0000'
+                }).setOrigin(0.5);
+            }
+        });
+
+        // Reposition on resize
+        this.elementsToUpdateOnResize.push(() => {
+            this.loginContainer?.setPosition(this.scale.width / 2, this.scale.height / 2);
+        });
+    }
+
+    private showWorldSelection(players: any[]) {
+        const centerX = this.scale.width / 2;
+
+        const instruction = this.add.text(centerX, 150, 'Select a World to Enter', {
+            fontSize: '18px',
             color: '#ffffff',
-        }).setOrigin(0.5, 0.5);
+        }).setOrigin(0.5);
+        this.elementsToUpdateOnResize.push(() => {
+            instruction.setPosition(this.scale.width / 2, 150);
+        });
 
-        // Display each world as a selectable option with a colored rectangle as a button
-        let yOffset = 300; 
+        let yOffset = 200;
         players.forEach((player: any) => {
             const { name, wealth, world } = player;
 
-            // Display world name as text
-            const worldText = this.add.text(100, yOffset, `🌏 ${world.name} ( ${name} has $${wealth} )`, {
+            const label = this.add.text(centerX - 150, yOffset, `🌍 ${world.name} (${name} has $${wealth})`, {
                 fontSize: '16px',
                 color: '#ffffff'
-            });
+            }).setOrigin(0, 0.5);
 
-            // Create a solid color rectangle as the selection button
-            const selectButton = this.add.rectangle(500, yOffset + 10, 100, 30, 0x00aaff)
+            const button = this.add.rectangle(centerX + 180, yOffset, 100, 30, 0x00aaff)
                 .setInteractive()
                 .setOrigin(0.5);
 
-            // Label the button
-            this.add.text(selectButton.x, selectButton.y, 'Select', {
+            const btnText = this.add.text(button.x, button.y, 'Enter', {
                 fontSize: '16px',
                 color: '#ffffff'
             }).setOrigin(0.5);
 
-            // Handle button click to enter the world
-            selectButton.on('pointerdown', () => {
+            button.on('pointerdown', () => {
                 this.scene.start('CityScene', player);
             });
 
-            yOffset += 50; // Adjust spacing between world options
+            yOffset += 50;
+
+            this.elementsToUpdateOnResize.push(() => {
+                label.setPosition(this.scale.width / 2 - 150, label.y);
+                button.setPosition(this.scale.width / 2 + 180, button.y);
+                btnText.setPosition(button.x, button.y);
+            });
         });
 
-        // Log out Button
-        const logoutButton = this.add.text(this.scale.width - 50, 50, 'Logout', {
-            fontSize: '16px',
+        const logoutButton = this.add.text(this.scale.width - 20, 20, 'Logout', {
+            fontSize: '14px',
             color: '#ffffff',
-            backgroundColor: '#ff0000',
+            backgroundColor: '#ff4444',
             padding: { x: 10, y: 5 }
-        }).setOrigin(1, 0);
-        logoutButton.setInteractive();
+        }).setOrigin(1, 0).setInteractive();
 
         logoutButton.on('pointerdown', () => {
             localStorage.removeItem("auth");
-            this.scene.restart(); // Reload the main menu scene
+            this.scene.restart();
+        });
+
+        this.elementsToUpdateOnResize.push(() => {
+            logoutButton.setPosition(this.scale.width - 20, 20);
         });
     }
 
-    // Update loop (for animations or real-time logic)
-    update(time: number, delta: number): void {
-        // Add any animations or background updates here if needed
+    private handleResize(gameSize: Phaser.Structs.Size) {
+        // Just reposition UI elements; do NOT call resize here
+        this.elementsToUpdateOnResize.forEach(fn => fn());
     }
 }

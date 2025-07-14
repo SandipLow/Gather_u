@@ -2,20 +2,20 @@ import { sprites } from "./assets";
 
 export class Player extends Phaser.GameObjects.GameObject {
     private sprite: Phaser.Physics.Arcade.Sprite;
-    private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null;
+    private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
     public scene: Phaser.Scene;
     private playerData: PlayerData;
     private animation: string | null = null;
     private animationPrefix: string;
-    private chatInput: Phaser.GameObjects.DOMElement;
 
-    constructor(scene: Phaser.Scene, playerData: PlayerData, handleSendMessage: (message: string) => void) {
+    constructor(scene: Phaser.Scene, playerData: PlayerData, cursors: Phaser.Types.Input.Keyboard.CursorKeys | null) {
         super(scene, 'Player');
 
-        // Store the scene and player data
+        // Store the scene and player data and initialize cursors
         this.scene = scene;
         this.playerData = playerData;
         this.animationPrefix = this.playerData.id + '-';
+        this.cursors = cursors;
 
         // Create a sprite for the player with the chosen texture
         this.sprite = scene.physics.add.sprite(playerData.checkpoint.x, playerData.checkpoint.y, playerData.spritesheet);
@@ -25,96 +25,8 @@ export class Player extends Phaser.GameObjects.GameObject {
         // Define animations
         this.createAnimations();
 
-        // Setup keyboard input
-        this.cursors = scene.input.keyboard ? scene.input.keyboard.createCursorKeys() : null;
-
         // Add player sprite to the scene
         scene.add.existing(this);
-
-        // chat input
-        const chatInput = document.createElement('input');
-        chatInput.type = 'text';
-        chatInput.placeholder = 'Type a message...';
-        chatInput.style.width = '100px';
-        chatInput.style.fontSize = '10px';
-        chatInput.style.zIndex = '1000';
-        chatInput.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
-        chatInput.style.border = '1px solid #000';
-        chatInput.style.padding = '5px';
-
-        // Listen for focus on the chat input field
-        chatInput.addEventListener('focus', () => {
-            if (this.scene.game.input.keyboard) {
-                this.scene.game.input.keyboard.enabled = false; // Disable Phaser's keyboard input
-            }
-        });
-
-        // Listen for blur (when the input field loses focus)
-        chatInput.addEventListener('blur', () => {
-            if (this.scene.game.input.keyboard) {
-                this.scene.game.input.keyboard.enabled = true; // Re-enable Phaser's keyboard input
-            }
-        });
-
-        // Listen for Enter key to send the message
-        chatInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault(); // Prevent form submission
-                const message = chatInput.value.trim();
-                if (message) {
-                    handleSendMessage(message);
-                    chatInput.value = '';
-                    chatInput.blur();
-                }
-            }
-        });
-
-        this.chatInput = this.scene.add.dom(this.scene.cameras.main.centerX, this.scene.cameras.main.centerY + 120, chatInput);
-        this.chatInput.setOrigin(0.5);
-        this.chatInput.setScrollFactor(0);
-        this.chatInput.setVisible(false);
-
-        // Make UI controls for mobile
-        const size = 10;
-        const margin = 10;
-        const baseX = this.scene.cameras.main.centerX - this.scene.scale.width/4 + 0.25*this.scene.scale.width/4;
-        const baseY = this.scene.cameras.main.centerY;
-        const buttonStyle: Phaser.Types.GameObjects.Text.TextStyle = {
-            fontSize: '10px',
-            color: '#ffffff',
-            backgroundColor: 'rgba(51, 51, 51, 0.6)',
-            padding: { x: 6, y: 6 },
-            align: 'center'
-        };
-
-        // Create buttons
-        const leftButton = this.scene.add.text(baseX - size - margin, baseY, '◀', buttonStyle).setInteractive();
-        const rightButton = this.scene.add.text(baseX + size + margin, baseY, '▶', buttonStyle).setInteractive();
-        const upButton = this.scene.add.text(baseX, baseY - size - margin, '▲', buttonStyle).setInteractive();
-        const downButton = this.scene.add.text(baseX, baseY + size + margin, '▼', buttonStyle).setInteractive();
-
-        [leftButton, rightButton, upButton, downButton].forEach(btn => {
-            btn.setOrigin(0.5);
-            btn.setScrollFactor(0);
-            btn.setDepth(1000);
-        });
-
-        // Touch/hold handling
-        leftButton.on('pointerdown', () => this.cursors ? this.cursors.left.isDown = true : null);
-        leftButton.on('pointerup', () => this.cursors ? this.cursors.left.isDown = false : null);
-        leftButton.on('pointerout', () => this.cursors ? this.cursors.left.isDown = false : null);
-
-        rightButton.on('pointerdown', () => this.cursors ? this.cursors.right.isDown = true : null);
-        rightButton.on('pointerup', () => this.cursors ? this.cursors.right.isDown = false : null);
-        rightButton.on('pointerout', () => this.cursors ? this.cursors.right.isDown = false : null);
-
-        upButton.on('pointerdown', () => this.cursors ? this.cursors.up.isDown = true : null);
-        upButton.on('pointerup', () => this.cursors ? this.cursors.up.isDown = false : null);
-        upButton.on('pointerout', () => this.cursors ? this.cursors.up.isDown = false : null);
-
-        downButton.on('pointerdown', () => this.cursors ? this.cursors.down.isDown = true : null);
-        downButton.on('pointerup', () => this.cursors ? this.cursors.down.isDown = false : null);
-        downButton.on('pointerout', () => this.cursors ? this.cursors.down.isDown = false : null);
     }
 
     // Dynamically create animations for the chosen sprite
@@ -186,20 +98,11 @@ export class Player extends Phaser.GameObjects.GameObject {
         return this.sprite;
     }
 
-    renderChatInput() {
-        if (this.chatInput.visible) return;
-        this.chatInput.setVisible(true);
-    }
-
-    hideChatInput() {
-        if (!this.chatInput.visible) return;
-        this.chatInput.setVisible(false);
-    }
-
     destroy() {
         this.sprite.destroy();
         super.destroy();
     }
+    
 }
 
 export class OtherPlayer extends Phaser.GameObjects.GameObject {

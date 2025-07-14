@@ -12,6 +12,12 @@ export default class CityScene extends Phaser.Scene {
     private overlay!: Phaser.GameObjects.Graphics;
     private overlayMask!: Phaser.GameObjects.Graphics;
     private nears: Set<OtherPlayer> = new Set();
+    private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
+    private chatInput!: Phaser.GameObjects.DOMElement;
+    private leftButton!: Phaser.GameObjects.Text;
+    private rightButton!: Phaser.GameObjects.Text;
+    private upButton!: Phaser.GameObjects.Text;
+    private downButton!: Phaser.GameObjects.Text;
 
     constructor() {
         super('CityScene');
@@ -114,8 +120,25 @@ export default class CityScene extends Phaser.Scene {
             }, 1000);
         }
 
+        this.events.on('shutdown', () => {
+            if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                this.socket.send(JSON.stringify({ type: 'leave_world', payload: { player_id: this.playerData.id } }));
+                this.socket.close();
+            }
+        });
+
+        this.events.on('destroy', () => {
+            if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                this.socket.send(JSON.stringify({ type: 'leave_world', payload: { player_id: this.playerData.id } }));
+                this.socket.close();
+            }
+        });
+
+
+
         // Create player
-        this.player = new Player(this, this.playerData, this.handleMessage.bind(this));
+        this.cursors = this.input.keyboard ? this.input.keyboard.createCursorKeys() : null;
+        this.player = new Player(this, this.playerData, this.cursors);
 
         // Set camera to follow player
         this.cameras.main.startFollow(this.player.getSprite());
@@ -149,6 +172,109 @@ export default class CityScene extends Phaser.Scene {
 
         this.overlayMask = this.add.graphics();
         this.overlayMask.setVisible(false);
+
+        // Render UI elements
+        const chatInput = document.createElement('input');
+        chatInput.type = 'text';
+        chatInput.placeholder = 'Type a message...';
+        chatInput.style.width = '100px';
+        chatInput.style.fontSize = '10px';
+        chatInput.style.zIndex = '1000';
+        chatInput.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+        chatInput.style.border = '1px solid #000';
+        chatInput.style.padding = '5px';
+
+        // Listen for focus on the chat input field
+        chatInput.addEventListener('focus', () => {
+            if (this.game.input.keyboard) {
+                this.game.input.keyboard.enabled = false; // Disable Phaser's keyboard input
+            }
+        });
+
+        // Listen for blur (when the input field loses focus)
+        chatInput.addEventListener('blur', () => {
+            if (this.game.input.keyboard) {
+                this.game.input.keyboard.enabled = true; // Re-enable Phaser's keyboard input
+            }
+        });
+
+        // Listen for Enter key to send the message
+        chatInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent form submission
+                const message = chatInput.value.trim();
+                if (message) {
+                    this.#handleMessage(message);
+                    chatInput.value = '';
+                    chatInput.blur();
+                }
+            }
+        });
+
+        // Chat input DOM element
+        this.chatInput = this.add.dom(0, 0, chatInput);
+        this.chatInput.setOrigin(0.5);
+        this.chatInput.setScrollFactor(0);
+        this.chatInput.setVisible(false);
+
+        // Directional controls for mobile
+        const buttonStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+            fontSize: '10px',
+            color: '#ffffff',
+            backgroundColor: 'rgba(51, 51, 51, 0.6)',
+            padding: { x: 6, y: 6 },
+            align: 'center'
+        };
+
+        // Create buttons
+        this.leftButton = this.add.text(0,0, '◀', buttonStyle).setInteractive();
+        this.rightButton = this.add.text(0, 0, '▶', buttonStyle).setInteractive();
+        this.upButton = this.add.text(0, 0, '▲', buttonStyle).setInteractive();
+        this.downButton = this.add.text(0, 0, '▼', buttonStyle).setInteractive();
+
+        [this.leftButton, this.rightButton, this.upButton, this.downButton].forEach(btn => {
+            btn.setOrigin(0.5);
+            btn.setScrollFactor(0);
+            btn.setDepth(1000);
+        });
+        
+        if (this.sys.game.device.os.desktop) {
+            // Hide buttons on desktop
+            this.leftButton.setVisible(false);
+            this.rightButton.setVisible(false);
+            this.upButton.setVisible(false);
+            this.downButton.setVisible(false);
+        }
+        else {
+            // Show buttons on mobile
+            this.leftButton.setVisible(true);
+            this.rightButton.setVisible(true);
+            this.upButton.setVisible(true);
+            this.downButton.setVisible(true);
+            
+            // Touch/hold handling
+            this.leftButton.on('pointerdown', () => this.cursors ? this.cursors.left.isDown = true : null);
+            this.leftButton.on('pointerup', () => this.cursors ? this.cursors.left.isDown = false : null);
+            this.leftButton.on('pointerout', () => this.cursors ? this.cursors.left.isDown = false : null);
+    
+            this.rightButton.on('pointerdown', () => this.cursors ? this.cursors.right.isDown = true : null);
+            this.rightButton.on('pointerup', () => this.cursors ? this.cursors.right.isDown = false : null);
+            this.rightButton.on('pointerout', () => this.cursors ? this.cursors.right.isDown = false : null);
+    
+            this.upButton.on('pointerdown', () => this.cursors ? this.cursors.up.isDown = true : null);
+            this.upButton.on('pointerup', () => this.cursors ? this.cursors.up.isDown = false : null);
+            this.upButton.on('pointerout', () => this.cursors ? this.cursors.up.isDown = false : null);
+    
+            this.downButton.on('pointerdown', () => this.cursors ? this.cursors.down.isDown = true : null);
+            this.downButton.on('pointerup', () => this.cursors ? this.cursors.down.isDown = false : null);
+            this.downButton.on('pointerout', () => this.cursors ? this.cursors.down.isDown = false : null);
+        }
+
+        this.#adjustUIElements();
+
+        this.scale.on('resize', () => {
+            this.#adjustUIElements();
+        });
 
     }
 
@@ -191,26 +317,73 @@ export default class CityScene extends Phaser.Scene {
             mask.invertAlpha = true;
             this.overlay.setMask(mask);
 
-            this.player?.renderChatInput();
+            this.#renderChatInput();
         }
 
         else {
-            this.player?.hideChatInput();
+            this.#hideChatInput();
         }
 
+    }
+
+    #renderChatInput() {
+        if (this.chatInput.visible) return;
+        this.chatInput.setVisible(true);
+    }
+
+    #hideChatInput() {
+        if (!this.chatInput.visible) return;
+        this.chatInput.setVisible(false);
     }
 
     addOtherPlayer(playerData: any) {
         this.otherPlayers[playerData.id] = new OtherPlayer(this, playerData);
     }
 
-    handleMessage(msg: string) {
+    #handleMessage(msg: string) {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.socket.send(JSON.stringify({
                 type: 'talk',
-                payload: { from: this.playerData.id, players: Array.from(this.nears).map(plr=> plr.getPlayerData().id), message: msg }
+                payload: { from: this.playerData.id, players: Array.from(this.nears).map(plr => plr.getPlayerData().id), message: msg }
             }));
         }
+    }
+
+    #adjustUIElements() {
+        const origin = {
+            x: this.cameras.main.centerX - 0.25 * this.scale.width,
+            y: this.cameras.main.centerY - 0.25 * this.scale.height
+        }
+
+        const unit = {
+            x: 0.01 * this.scale.width / 2,
+            y: 0.01 * this.scale.height / 2
+        }
+
+        const getPosition = (x: number, y: number) => {
+            return {
+                x: origin.x + x * unit.x,
+                y: origin.y + y * unit.y
+            };
+        }
+
+        const chatInputPosition = getPosition(50, 80);
+        this.chatInput.setPosition(chatInputPosition.x, chatInputPosition.y);
+
+        const { x: baseX, y: baseY } = getPosition(15, 50);
+        const size = 10;
+        const margin = 10;
+        
+        this.leftButton.setPosition(baseX - size - margin, baseY);
+        this.rightButton.setPosition(baseX + size + margin, baseY);
+        this.upButton.setPosition(baseX, baseY - size - margin);
+        this.downButton.setPosition(baseX, baseY + size + margin);
+
+        [this.leftButton, this.rightButton, this.upButton, this.downButton].forEach(btn => {
+            btn.setOrigin(0.5);
+            btn.setScrollFactor(0);
+            btn.setDepth(1000);
+        });
     }
 }
 
