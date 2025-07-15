@@ -83,7 +83,7 @@ export default class SocketServer {
             for (const player_id in this.players) {
                 const player = this.players[player_id];
                 // If the player's socket is not open, remove them from the world
-                if (!player.socket || player.socket.readyState !== WebSocket.OPEN) {
+                if (player.socket && player.socket.readyState !== WebSocket.OPEN) {
                     this.handleLeaveWorld({ player_id });
                     // Publish leave event to Redis
                     this.redisPub.publish('world-events', JSON.stringify({ type: Strings.WS_LEAVE_WORLD, payload: { player_id }, serverid: this.serverid }));

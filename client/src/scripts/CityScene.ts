@@ -80,13 +80,17 @@ export default class CityScene extends Phaser.Scene {
             // Listen for player enter world events
             if (type === 'enter_world') {
                 const { player } = payload;
-                this.addOtherPlayer(player);
+                this.addOtherPlayer({
+                    ...player,
+                    position: player.position || player.checkpoint
+                });
             }
 
             // Listen for player movement events
             else if (type === 'move') {
                 const { player_id, data: { x, y, animation, timestamp } } = payload;
                 if (this.otherPlayers[player_id]) {
+                    console.log(`Updating player ${this.otherPlayers[player_id].name} position to (${x}, ${y}) with animation ${animation}`);
                     this.otherPlayers[player_id].update(animation, x, y, timestamp);
                 }
             }
@@ -111,13 +115,8 @@ export default class CityScene extends Phaser.Scene {
 
         // reconnect on close
         this.socket.onclose = () => {
-            console.log('Disconnected from server, attempting to reconnect...');
-            setTimeout(() => {
-                this.socket = connectToWebSocket();
-                this.socket.onopen = this.socket.onopen;
-                this.socket.onmessage = this.socket.onmessage;
-                this.socket.onclose = this.socket.onclose;
-            }, 1000);
+            this.scene.restart(this.playerData);
+            console.log('Disconnected from server, attempting to reconnect...');;
         }
 
         this.events.on('shutdown', () => {
@@ -307,8 +306,8 @@ export default class CityScene extends Phaser.Scene {
             for (const otherPlayer of this.nears) {
                 this.overlayMask.fillStyle(0xffffff, 1);
                 this.overlayMask.fillCircle(
-                    otherPlayer.position.x,
-                    otherPlayer.position.y,
+                    otherPlayer.getPlayerData().position.x,
+                    otherPlayer.getPlayerData().position.y,
                     50
                 );
             }

@@ -3,10 +3,6 @@ import db from "../lib/db";
 import Strings from "../res/strings";
 import Player from "./Player";
 
-export interface WorldDataWithPlayers extends WorldData {
-    onlinePlayers: PlayerData[];
-}
-
 export default class World {
     id: string;
     name: string;
@@ -19,7 +15,7 @@ export default class World {
     }
 
     // Get all players in the world
-    async getPlayers() {
+    async getAllPlayers() {
         // simulate a database query : "SELECT * FROM Players WHERE worldId = this.id"
         const res = await getDocs(query(
             collection(db, Strings.PLAYERS_COLLECTION),
@@ -78,10 +74,47 @@ export default class World {
         }));
     }
 
+    // movement logic
+    move(player: Player, x: number, y: number, animation: string, timestamp: number) {
+        // Check if the player is in the world
+        if (!this.onlinePlayers[player.id]) return;
+
+        // Update the player's position
+        player.position = { x, y };
+
+        const distants = new Set<string>();
+        distants.add(player.id);
+
+        for (const p of this.getOnlinePlayers()) {
+            // calculate the distance between the player and the other players
+            const dx = p.position.x - x;
+            const dy = p.position.y - y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // if the distance is greater than 500, ignore the player
+            if (distance > 500) {
+                distants.add(p.id);
+            }
+
+        }
+
+        this.emit(player, JSON.stringify({
+            type: Strings.WS_MOVE,
+            payload: {
+                player_id: player.id,
+                data: { x, y, animation, timestamp }
+            },
+        }), distants);
+    }
+
     // emit a message to all players in the world except the player
-    emit(player: Player, message: string) {
+    emit(player: Player, message: string, ignores: Set<string> = new Set()) {
         for (const player_id in this.onlinePlayers) {
             const otherPlayer = this.onlinePlayers[player_id];
+
+            // skip ignored players
+            if (ignores.has(otherPlayer.id)) continue;
+
             // skip the player who sent the message
             if (otherPlayer.id === player.id) continue;
 
@@ -95,20 +128,6 @@ export default class World {
             const p = this.onlinePlayers[player_id];
             p.send(message);
         };
-    }
-
-    // movement logic
-    move(player: Player, x: number, y: number, animation: string, timestamp: number) {
-        // Check if the player is in the world
-        if (!this.onlinePlayers[player.id]) return;
-
-        this.emit(player, JSON.stringify({
-            type: Strings.WS_MOVE,
-            payload: {
-                player_id: player.id,
-                data: { x, y, animation, timestamp }
-            },
-        }));
     }
 
     // export the world data (For saving the world)

@@ -9,7 +9,7 @@ import SocketServer from "./lib/websocket";
 
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000');
 
 const server = createServer(app);
 

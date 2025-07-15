@@ -14,11 +14,12 @@ export default class Player {
     wealth: number
     spritesheet: string
     checkpoint: { x: number, y: number }
+    position: { x: number, y: number }
 
     // Technical information
     socket: WebSocket | null
 
-    constructor({ id, user_id, world_id, name, wealth, spritesheet, checkpoint }: PlayerData, socket: WebSocket | null) {
+    constructor({ id, user_id, world_id, name, wealth, spritesheet, checkpoint, position }: PlayerData & {position?: {x:number, y:number}}, socket: WebSocket | null) {
         this.id = id
         this.user_id = user_id
         this.world_id = world_id
@@ -26,6 +27,7 @@ export default class Player {
         this.wealth = wealth
         this.spritesheet = spritesheet
         this.checkpoint = checkpoint
+        this.position = position ?? checkpoint;
         this.socket = socket
     }
 
@@ -55,7 +57,8 @@ export default class Player {
             name: this.name,
             wealth: this.wealth,
             spritesheet: this.spritesheet,
-            checkpoint: this.checkpoint
+            checkpoint: this.checkpoint,
+            position: this.position
         }
     }
 
@@ -71,7 +74,7 @@ export default class Player {
     }
 
     // export the player data (For saving the player)
-    exportData(): PlayerData {
+    exportData(): OnlinePlayerData {
         return {
             id: this.id,
             user_id: this.user_id,
@@ -79,7 +82,8 @@ export default class Player {
             name: this.name,
             wealth: this.wealth,
             spritesheet: this.spritesheet,
-            checkpoint: this.checkpoint
+            checkpoint: this.checkpoint,
+            position: this.position
         }
     }
 

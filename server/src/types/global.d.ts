@@ -33,6 +33,10 @@ declare global {
         name: string;
     }
 
+    type WorldDataWithPlayers = WorldData & {
+        onlinePlayers: PlayerData[];
+    }
+
     type PlayerData = {
         id: string;
         user_id: string;
@@ -42,6 +46,8 @@ declare global {
         wealth: number;
         checkpoint: { x: number; y: number };
     }
+
+    type OnlinePlayerData = PlayerData & { position: { x: number; y: number } };
 }
 
 export {};
