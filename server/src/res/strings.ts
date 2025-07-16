@@ -4,6 +4,7 @@ export default class Strings {
     static WS_LEAVE_WORLD = 'leave_world'
     static WS_MOVE = 'move'
     static WS_TALK = 'talk'
+    static WS_PING = 'ping'
     
     static REDIS_WORLD_EVENT_CHANNEL = 'world-events'
     static REDIS_PLAYERS_KEY = 'players'

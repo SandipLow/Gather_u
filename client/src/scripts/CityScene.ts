@@ -72,6 +72,13 @@ export default class CityScene extends Phaser.Scene {
                 this.socket.send(JSON.stringify({ type: 'enter_world', payload: { player_id: this.playerData.id } }));
             }
 
+            // ping the server every 10 seconds
+            setInterval(() => {
+                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                    this.socket.send(JSON.stringify({ type: 'ping', payload: { player_id: this.playerData.id } }));
+                }
+            }, 10000);
+
         }
 
         this.socket.onmessage = (event) => {

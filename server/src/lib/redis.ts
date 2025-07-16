@@ -82,6 +82,18 @@ export default class RedisPubSub {
         this.redisPub.publish(this.WorldEventChannel, JSON.stringify(data));
     }
 
+    playerPinging(player_id: string) {
+        this.redisPub.set(
+            `player:${player_id}:ping`,
+            Date.now().toString(),
+        )
+    }
+
+    async getPlayerPing(player_id: string): Promise<number | null> {
+        const ping = await this.redisPub.get(`player:${player_id}:ping`);
+        return ping ? parseInt(ping) : null;
+    }
+
     quit() {
         this.redisPub.quit();
         this.redisSub.quit();
