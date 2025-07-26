@@ -8,6 +8,8 @@ Gather_u is a browser-based multiplayer RPG where players can create characters,
 
 ## 🏗️ Architecture
 
+![Architecture Diagram](/doc/architecture.png)
+
 The project follows a client-server architecture:
 
 ### Client (`/client`)
@@ -80,9 +82,10 @@ This project is currently in active development. Core systems being implemented 
 - ✅ Basic client-server communication
 - ✅ Character sprite rendering
 - ✅ WebSocket connection handling
-- 🔄 Player movement and physics
-- 🔄 World persistence
+- ✅ Player movement and physics
 - 🔄 User authentication
+- 🔄 Scaling
+- ⏳ World persistence
 - ⏳ Combat system
 - ⏳ Inventory management
 - ⏳ Chat system
