@@ -5,10 +5,9 @@ export default class RedisPubSub {
     redisPub: Redis;
     redisSub: Redis;
     private WorldEventChannel = Strings.REDIS_WORLD_EVENT_CHANNEL;
-    private PlayersKey = Strings.REDIS_PLAYERS_KEY;
-    private WorldsKey = Strings.REDIS_WORLDS_KEY;
 
     constructor(
+        serverid: string,
         handleError: (err: Error)=>void, 
         handleMessage: (channel: string, message: string)=>void
     ) {
@@ -35,8 +34,8 @@ export default class RedisPubSub {
             host: redisUrl.split(':')[0]
         });
 
-        // Subscribe to relevant Redis channels
-        this.redisSub.subscribe(this.WorldEventChannel, (err, count) => {
+        // Subscribe to relevant Redis channels. World events and own server communication channel
+        this.redisSub.subscribe(this.WorldEventChannel, RedisPubSub.getServerCommunicationChannel(serverid), (err, count) => {
             if (err) {
                 console.error('Failed to subscribe: ', err);
                 return;
@@ -44,7 +43,15 @@ export default class RedisPubSub {
             console.log(`Subscribed successfully! This client is currently subscribed to ${count} channels.`);
         });
 
+        // Handle incoming messages
         this.redisSub.on('message', handleMessage);
+
+
+        // Publish an initial message to the world event channel
+        this.redisPub.publish(this.WorldEventChannel, JSON.stringify({
+            type: Strings.WS_INIT,
+            payload: { serverid: serverid }
+        }));
 
 
         // Handle Redis errors
@@ -52,34 +59,19 @@ export default class RedisPubSub {
         this.redisSub.on('error', handleError);
     }
 
-    saveData(
-        {
-            players,
-            worlds,
-        }: {
-            players: OnlinePlayerData[];
-            worlds: WorldDataWithPlayers[];
-        }
-    ) {
-        this.redisPub.set(this.PlayersKey, JSON.stringify(players));
-        this.redisPub.set(this.WorldsKey, JSON.stringify(worlds));
-    }
-
-    async getData(): Promise<{
-        players: OnlinePlayerData[];
-        worlds: WorldDataWithPlayers[];
-    }> {
-        const players = await this.redisPub.get(this.PlayersKey);
-        const worlds = await this.redisPub.get(this.WorldsKey);
-
-        return {
-            players: players ? JSON.parse(players) : [],
-            worlds: worlds ? JSON.parse(worlds) : [],
-        };
-    }
-
+    // Publish a message to the world
     publishWorldEvent(data: any) {
         this.redisPub.publish(this.WorldEventChannel, JSON.stringify(data));
+    }
+
+    // Publish a message to a specific server
+    publishServerEvent(serverid: string, data: any) {
+        this.redisPub.publish(RedisPubSub.getServerCommunicationChannel(serverid), JSON.stringify(data));
+    }
+
+    // Static method to get the server communication channel name
+    static getServerCommunicationChannel(serverid: string) {
+        return `server-communication-${serverid}`;
     }
 
     quit() {

@@ -20,6 +20,7 @@ export default class SocketServer {
         this.wss.on("connection", this.onConnection.bind(this));
 
         this.redis = new RedisPubSub(
+            this.serverid,
             (err) => console.error("Redis error:", err),
             this.onRedisMessage.bind(this)
         );
@@ -27,44 +28,6 @@ export default class SocketServer {
         process.on('exit', () => this.redis.quit());
 
         this.wss.on("error", (error) => console.error("WebSocket error:", error));
-    }
-
-    async saveStateToRedis() {
-        const playersData: any[] = [];
-        const worldsData: any[] = [];
-
-        for (const player of Object.values(this.players)) {
-            playersData.push(player.exportData());
-        }
-
-        for (const world of Object.values(this.worlds)) {
-            worldsData.push(world.exportData());
-        }
-
-        this.redis.saveData({
-            players: playersData,
-            worlds: worldsData,
-        });
-    }
-
-    async loadStateFromRedis() {
-        try {
-            const { players, worlds } = await this.redis.getData();
-
-            for (const pdata of players) {
-                const player = new Player(pdata, null);
-                this.players[player.id] = player;
-            }
-
-            for (const wdata of worlds) {
-                const world = World.createWorld(wdata)
-                this.worlds[world.id] = world;
-            }
-
-            console.log(`[Redis] Restored ${players.length} players and ${worlds.length} worlds from snapshot.`);
-        } catch (err) {
-            console.error('Error loading Redis snapshot:', err);
-        }
     }
 
     onConnection(ws: WebSocket) {
@@ -92,6 +55,38 @@ export default class SocketServer {
             case Strings.WS_TALK:
                 this.handleTalk(payload);
                 break;
+            
+            // send connected players and worlds data to the new server connected
+            case Strings.WS_INIT:
+                // Send Players and Worlds data to the new server
+                const playersData = Object.values(this.players).filter(player => !!player.socket).map(player => player.exportData());
+                const worldsData = Object.values(this.worlds).map(world => world.exportData());
+                this.redis.redisPub.publish(RedisPubSub.getServerCommunicationChannel(this.serverid), JSON.stringify({
+                    type: Strings.WS_INIT+"_response",
+                    payload: {
+                        players: playersData,
+                        worlds: worldsData,
+                    },
+                    serverid: this.serverid,
+                }));
+                break;
+            
+            // Handle initialization response from Redis
+            case Strings.WS_INIT + "_response":
+                // Initialize worlds and players from the received data
+                const { players, worlds } = payload as { players: OnlinePlayerData[], worlds: WorldDataWithPlayers[] };
+
+                for (const playerData of players) {
+                    const player = new Player(playerData, null);
+                    this.players[player.id] = player;
+                }
+
+                for (const worldData of worlds) {
+                    const world = World.createWorld(worldData);
+                    this.worlds[world.id] = world;
+                }
+                break;
+
             default:
                 console.error('Unknown message type from Redis:', type);
         }
