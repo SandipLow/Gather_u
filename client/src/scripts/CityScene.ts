@@ -72,13 +72,6 @@ export default class CityScene extends Phaser.Scene {
                 this.socket.send(JSON.stringify({ type: 'enter_world', payload: { player_id: this.playerData.id } }));
             }
 
-            // ping the server every 10 seconds
-            setInterval(() => {
-                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-                    this.socket.send(JSON.stringify({ type: 'ping', payload: { player_id: this.playerData.id } }));
-                }
-            }, 10000);
-
         }
 
         this.socket.onmessage = (event) => {
@@ -97,7 +90,6 @@ export default class CityScene extends Phaser.Scene {
             else if (type === 'move') {
                 const { player_id, data: { x, y, animation, timestamp } } = payload;
                 if (this.otherPlayers[player_id]) {
-                    console.log(`Updating player ${this.otherPlayers[player_id].name} position to (${x}, ${y}) with animation ${animation}`);
                     this.otherPlayers[player_id].update(animation, x, y, timestamp);
                 }
             }

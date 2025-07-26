@@ -27,29 +27,6 @@ export default class SocketServer {
         process.on('exit', () => this.redis.quit());
 
         this.wss.on("error", (error) => console.error("WebSocket error:", error));
-
-        // Periodically clean up, watch-dog, save state
-        setInterval(async () => {
-            for (const player_id in this.players) {
-                
-                const player = this.players[player_id];
-                const lastSeen = await this.redis.getPlayerPing(player_id);
-                const isGhosted = !lastSeen || Date.now() - Number(lastSeen) > 15000 || (player.socket && player.socket.readyState !== WebSocket.OPEN);
-                
-                if (isGhosted) {
-                    this.handleLeaveWorld({ player_id });
-                    this.redis.publishWorldEvent({
-                        type: Strings.WS_LEAVE_WORLD,
-                        payload: { player_id },
-                        serverid: this.serverid
-                    });
-                }
-            }
-
-            // this.saveStateToRedis().catch(console.error);
-        }, 10000);
-
-        // this.loadStateFromRedis().catch(console.error);
     }
 
     async saveStateToRedis() {
@@ -98,6 +75,8 @@ export default class SocketServer {
 
     onRedisMessage(channel: string, message: string) {
         const { type, payload, serverid } = JSON.parse(message);
+
+        // Ignore messages from own server
         if (serverid === this.serverid) return;
 
         switch (type) {
@@ -121,32 +100,23 @@ export default class SocketServer {
     onMessage(ws: WebSocket, data: string | Buffer) {
         try {
             const { type, payload } = JSON.parse(data.toString());
+            
+            // publish the event to Redis
+            this.redis.publishWorldEvent({ type, payload, serverid: this.serverid });
 
             switch (type) {
                 case Strings.WS_ENTER_WORLD:
                     this.handleEnterWorld(payload, ws);
-                    this.redis.publishWorldEvent({ type, payload, serverid: this.serverid });
                     break;
-
                 case Strings.WS_LEAVE_WORLD:
                     this.handleLeaveWorld(payload);
-                    this.redis.publishWorldEvent({ type, payload, serverid: this.serverid });
                     break;
-
                 case Strings.WS_MOVE:
                     this.handleMove(payload);
-                    this.redis.publishWorldEvent({ type, payload, serverid: this.serverid });
                     break;
-
                 case Strings.WS_TALK:
                     this.handleTalk(payload);
-                    this.redis.publishWorldEvent({ type, payload, serverid: this.serverid });
                     break;
-
-                case Strings.WS_PING:
-                    this.redis.playerPinging(payload.player_id);
-                    break;
-
                 default:
                     console.error('Unknown message type:', type);
             }
