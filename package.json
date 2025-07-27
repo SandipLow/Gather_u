@@ -1,13 +1,12 @@
 {
-  "name": "gather_u",
-  "scripts": {
-    "dev": "cd client && npm run dev & cd server && npm run dev",
-    "dev_s2": "cd client && VITE_WS_URL=ws://localhost:5000 VITE_API_URL=http://localhost:5000 yarn dev & cd server && PORT=5000 yarn dev"
-  },
-  "version": "1.0.0",
-  "main": "index.js",
-  "author": "Sandip Low",
-  "license": "MIT",
-  "private": false,
-  "packageManager": "yarn@1.22.19+sha1.4ba7fc5c6e704fce2066ecbfb0b0d8976fe62447"
+    "name": "gather_u",
+    "scripts": {
+        "dev": "cd client && yarn dev & cd server && yarn dev"
+    },
+    "version": "1.0.0",
+    "main": "index.js",
+    "author": "Sandip Low",
+    "license": "MIT",
+    "private": true,
+    "packageManager": "yarn@1.22.19+sha1.4ba7fc5c6e704fce2066ecbfb0b0d8976fe62447"
 }

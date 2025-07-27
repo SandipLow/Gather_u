@@ -11,6 +11,7 @@
 **/.output/
 **/.vercel/
 **/.netlify/
+**/.turbo/
 
 # Environment variables (anywhere in the project)
 **/.env

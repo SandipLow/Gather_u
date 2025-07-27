@@ -59,32 +59,18 @@ export default class SocketServer {
             // send connected players and worlds data to the new server connected
             case Strings.WS_INIT:
                 // Send Players and Worlds data to the new server
-                const playersData = Object.values(this.players).filter(player => !!player.socket).map(player => player.exportData());
-                const worldsData = Object.values(this.worlds).map(world => world.exportData());
-                this.redis.redisPub.publish(RedisPubSub.getServerCommunicationChannel(this.serverid), JSON.stringify({
-                    type: Strings.WS_INIT+"_response",
-                    payload: {
-                        players: playersData,
-                        worlds: worldsData,
-                    },
-                    serverid: this.serverid,
-                }));
+                const data = this.#exportConnectedPlayersAndWorlds();
+                this.redis.publishWorldEvent({
+                    type: Strings.WS_INIT + "_response",
+                    payload: data,
+                    serverid: this.serverid
+                });
                 break;
             
             // Handle initialization response from Redis
             case Strings.WS_INIT + "_response":
                 // Initialize worlds and players from the received data
-                const { players, worlds } = payload as { players: OnlinePlayerData[], worlds: WorldDataWithPlayers[] };
-
-                for (const playerData of players) {
-                    const player = new Player(playerData, null);
-                    this.players[player.id] = player;
-                }
-
-                for (const worldData of worlds) {
-                    const world = World.createWorld(worldData);
-                    this.worlds[world.id] = world;
-                }
+                this.#importPlayersAndWorlds(payload);
                 break;
 
             default:
@@ -127,6 +113,23 @@ export default class SocketServer {
             }
         }
         return null;
+    }
+
+    #exportConnectedPlayersAndWorlds(): { worlds: WorldDataWithPlayers[] } {
+        return {
+            worlds: Object.values(this.worlds).map(world => world.exportData()),
+        };
+    }
+
+    async #importPlayersAndWorlds(data: { worlds: WorldDataWithPlayers[] }) {
+        for (const worldData of data.worlds) {
+            const world = World.createWorld(worldData);
+            this.worlds[world.id] = world;
+
+            for (const player of world.getOnlinePlayers()) {
+                this.players[player.id] = player;
+            }
+        }
     }
 
     onClose(ws: WebSocket) {
