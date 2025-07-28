@@ -50,7 +50,8 @@ export default class RedisPubSub {
         // Publish an initial message to the world event channel
         this.redisPub.publish(this.WorldEventChannel, JSON.stringify({
             type: Strings.WS_INIT,
-            payload: { serverid: serverid }
+            payload: { serverid },
+            serverid
         }));
 
 
