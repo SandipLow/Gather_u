@@ -41,7 +41,7 @@ export default class SocketServer {
         ws.on("close", this.onClose.bind(this, ws));
     }
 
-    async onRedisMessage(channel: string, message: string) {
+    onRedisMessage(channel: string, message: string) {
         const { type, payload, serverid } = JSON.parse(message);
 
         // Ignore messages from own server
@@ -76,7 +76,7 @@ export default class SocketServer {
             // Handle initialization response from Redis
             case Strings.WS_INIT + "_response":
                 // Initialize worlds and players from the received data
-                await this.#importPlayers(payload);
+                this.#importPlayers(payload);
                 break;
 
             default:
@@ -125,9 +125,9 @@ export default class SocketServer {
         return Object.values(this.players).filter(plr => plr.socket).map(plr => plr.id);
     }
 
-    async #importPlayers(data: string[]) {
+    #importPlayers(data: string[]) {
         for (const player_id of data) {
-            await this.handleEnterWorld({ player_id }, null);
+            this.handleEnterWorld({ player_id }, null);
         }
     }
 

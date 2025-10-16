@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:s2": "vite --mode s2 --port 5174",
+    "dev:s3": "vite --mode s3 --port 5175",
+
     "build": "vite build && cp -a ./assets/* ./dist/assets",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.node.json"
