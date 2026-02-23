@@ -183,6 +183,9 @@ export default class SocketServer {
     }
 
     handleLeaveWorld(payload: any) {
+        console.log("inside leave world handler");
+        
+
         const { player_id } = payload;
         const player = this.players[player_id];
         if (!player) return;
@@ -192,6 +195,9 @@ export default class SocketServer {
 
         world.removePlayer(player);
         delete this.players[player_id];
+
+        console.log("Now Players: ", Object.keys(this.players));
+        
     }
 
     handleMove(payload: any) {

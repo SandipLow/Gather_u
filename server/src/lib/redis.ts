@@ -21,15 +21,15 @@ export default class RedisPubSub {
         }
 
         this.redisPub = new Redis({
-            username: redisUsername,
-            password: redisPassword,
+            // username: redisUsername,
+            // password: redisPassword,
             port: parseInt(redisUrl.split(':')[1]),
             host: redisUrl.split(':')[0],
         });
 
         this.redisSub = new Redis({
-            username: redisUsername,
-            password: redisPassword,
+            // username: redisUsername,
+            // password: redisPassword,
             port: parseInt(redisUrl.split(':')[1]),
             host: redisUrl.split(':')[0]
         });

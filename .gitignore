@@ -91,6 +91,7 @@
 # Temporary files
 **/tmp/
 **/temp/
+todo.md
 
 # Database files
 **/*.sqlite
