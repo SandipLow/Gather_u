@@ -1,6 +1,5 @@
 import { getDocs, collection, where, query, getDoc, doc, addDoc, updateDoc } from "firebase/firestore";
-import db from "../lib/db";
-import Strings from "../res/strings";
+import db, { Collections } from "../lib/db";
 import Player from "./Player";
 
 export default class User {
@@ -20,40 +19,40 @@ export default class User {
     async getPlayers() {
         // simulate a database query : "SELECT * FROM Players WHERE userId = this.id"
         const res = await getDocs(query(
-            collection(db, Strings.PLAYERS_COLLECTION),
+            collection(db, Collections.PLAYERS),
             where("user_id", "==", this.id)
         ));
 
-        return res.docs.map(async (doc) => {
+        return await Promise.all(res.docs.map(async (doc) => {
             const playerData = {id: doc.id, ...doc.data()} as PlayerData;
-            const worldData = await new Player(playerData, null).getWorld();
+            const worldData = await new Player(playerData).getWorld();
 
             return {
                 ...playerData,
                 world: worldData
             };
-        });
+        }));
 
     }
 
     // Get the user data
-    getData() {
+    async getData() {
         return {
             id: this.id,
             name: this.name,
             email: this.email,
-            players: this.getPlayers()
+            players: await this.getPlayers()
         }
     }
 
     // database operations
     static async create(userData: Omit<UserData, "id">) {
-        const res = await addDoc(collection(db, Strings.USERS_COLLECTION), userData);
+        const res = await addDoc(collection(db, Collections.USERS), userData);
         return new User({id: res.id, ...userData});
     }
 
     static async getAll() {
-        const res = await getDocs(collection(db, Strings.USERS_COLLECTION));
+        const res = await getDocs(collection(db, Collections.USERS));
         return res.docs.map(doc => {
             const userData = {id: doc.id, ...doc.data()} as UserData;
             return new User(userData);
@@ -61,7 +60,7 @@ export default class User {
     }
 
     static async get(id: string) {
-        const res = await getDoc(doc(db, Strings.USERS_COLLECTION, id));
+        const res = await getDoc(doc(db, Collections.USERS, id));
         if (!res.exists()) return null;
 
         const userData = {id: res.id, ...res.data()} as UserData;
@@ -70,7 +69,7 @@ export default class User {
 
     static async getByEmail(email: string) {
         const res = await getDocs(query(
-            collection(db, Strings.USERS_COLLECTION),
+            collection(db, Collections.USERS),
             where("email", "==", email)
         ));
 
@@ -81,10 +80,10 @@ export default class User {
     }
 
     static async update(id: string, userData: Partial<Omit<UserData, "id">>) {
-        const res = await getDoc(doc(db, Strings.USERS_COLLECTION, id));
+        const res = await getDoc(doc(db, Collections.USERS, id));
         if (!res.exists()) return null;
 
-        await updateDoc(doc(db, Strings.USERS_COLLECTION, id), userData);
+        await updateDoc(doc(db, Collections.USERS, id), userData);
     }
 
     

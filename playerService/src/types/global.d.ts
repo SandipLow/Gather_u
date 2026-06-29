@@ -47,7 +47,7 @@ declare global {
         checkpoint: { x: number; y: number };
     }
 
-    type OnlinePlayerData = PlayerData & { position: { x: number; y: number } };
+    type OnlinePlayerData = PlayerData & { position?: { x: number; y: number }; animation?: string, timestamp?: number };
 }
 
 export {};

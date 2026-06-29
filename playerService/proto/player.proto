@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package player;
+
+service PlayerService {
+  rpc EnterPlayerWorld    (EnterRequest)  returns (PlayerListResponse);
+  rpc LeavePlayerWorld    (LeaveRequest)  returns (PlayerListResponse);
+  rpc SetPlayerCoordinates (MoveRequest)  returns (PlayerListResponse);
+}
+
+message EnterRequest  { string playerId = 1; }
+message LeaveRequest  { string playerId = 1; }
+message MoveRequest   { string playerId = 1; float x = 2; float y = 3; string animation = 4; int64 timestamp = 5; }
+
+message PlayerListResponse { repeated string playerIds = 1; }

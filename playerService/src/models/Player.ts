@@ -1,12 +1,9 @@
-import WebSocket from 'ws'
-import db from '../lib/db'
+import db, { Collections } from '../lib/db'
 import { getDoc, doc, addDoc, collection, getDocs, updateDoc } from 'firebase/firestore'
-import Strings from '../res/strings'
 import User from './User'
 import World from './World'
 
 export default class Player {
-    // Personal information
     id: string
     user_id: string
     world_id: string
@@ -14,28 +11,24 @@ export default class Player {
     wealth: number
     spritesheet: string
     checkpoint: { x: number, y: number }
+
+
     position: { x: number, y: number }
+    animation: string
+    timestamp: number
 
-    // Technical information
-    socket: WebSocket | null
+    constructor(playerData: OnlinePlayerData) {
+        this.id = playerData.id
+        this.user_id = playerData.user_id
+        this.world_id = playerData.world_id
+        this.name = playerData.name
+        this.wealth = playerData.wealth
+        this.spritesheet = playerData.spritesheet
+        this.checkpoint = playerData.checkpoint
 
-    constructor({ id, user_id, world_id, name, wealth, spritesheet, checkpoint, position }: PlayerData & {position?: {x:number, y:number}}, socket: WebSocket | null) {
-        this.id = id
-        this.user_id = user_id
-        this.world_id = world_id
-        this.name = name
-        this.wealth = wealth
-        this.spritesheet = spritesheet
-        this.checkpoint = checkpoint
-        this.position = position ?? checkpoint;
-        this.socket = socket
-    }
-
-    // Send a message to the player
-    send(message: string) {
-        if (!this.socket) return
-
-        this.socket.send(message)
+        this.position = playerData.position ?? playerData.checkpoint;
+        this.animation = playerData.animation ?? "idle"
+        this.timestamp = playerData.timestamp ?? Date.now();
     }
 
     // Get the user of the player
@@ -49,16 +42,18 @@ export default class Player {
     }
 
     // Get the player data
-    getData() {
+    async getData() {
         return {
             id: this.id,
-            user: this.getUser(),
-            world: this.getWorld(),
+            user: await this.getUser(),
+            world: await this.getWorld(),
             name: this.name,
             wealth: this.wealth,
             spritesheet: this.spritesheet,
             checkpoint: this.checkpoint,
-            position: this.position
+            position: this.position,
+            animation: this.animation,
+            timestamp: this.timestamp
         }
     }
 
@@ -83,45 +78,48 @@ export default class Player {
             wealth: this.wealth,
             spritesheet: this.spritesheet,
             checkpoint: this.checkpoint,
-            position: this.position
+
+            position: this.position,
+            animation: this.animation,
+            timestamp: this.timestamp
         }
     }
 
-    // get distance from another player
+    // get distance from a given (x, y)
     getDistance(x: number, y: number) {
-        const dx = this.checkpoint.x - x;
-        const dy = this.checkpoint.y - y;
+        const dx = this.position.x - x;
+        const dy = this.position.y - y;
         return Math.sqrt(dx * dx + dy * dy);
     }
 
 
     // database operations
     static async create(playerData: Omit<PlayerData, "id">) {
-        const res = await addDoc(collection(db, Strings.PLAYERS_COLLECTION), playerData)
-        return new Player({ id: res.id, ...playerData }, null)
+        const res = await addDoc(collection(db, Collections.PLAYERS), playerData)
+        return new Player({ id: res.id, ...playerData })
     }
 
     static async getAll() {
-        const res = await getDocs(collection(db, Strings.PLAYERS_COLLECTION))
+        const res = await getDocs(collection(db, Collections.PLAYERS))
         return res.docs.map(doc => {
             const playerData = { id: doc.id, ...doc.data() } as PlayerData
-            return new Player(playerData, null)
+            return new Player(playerData)
         })
     }
 
     static async get(id: string) {
-        const res = await getDoc(doc(db, Strings.PLAYERS_COLLECTION, id))
+        const res = await getDoc(doc(db, Collections.PLAYERS, id))
         if (!res.exists()) return null
 
         const playerData = { id: res.id, ...res.data() } as PlayerData
-        return new Player(playerData, null)
+        return new Player(playerData)
     }
 
     static async update(id: string, playerData: Partial<Omit<PlayerData, "id">>) {
-        const res = await getDoc(doc(db, Strings.PLAYERS_COLLECTION, id))
+        const res = await getDoc(doc(db, Collections.PLAYERS, id))
         if (!res.exists()) return null
 
-        await updateDoc(doc(db, Strings.PLAYERS_COLLECTION, id), playerData)
+        await updateDoc(doc(db, Collections.PLAYERS, id), playerData)
     }
 
 }

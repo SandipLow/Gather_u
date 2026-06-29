@@ -3,12 +3,20 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import fetchUser from '../middlewares/fetchUser';
+import Player from '../models/Player';
 
 const router = Router();
 
+
+// Get user data along with their players
 router.get('/', fetchUser, async (req, res) => {
     try {
-        const user_id = req.user!.id;
+        const user_id = req.user?.id;
+        if (!user_id) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+
         const user = await User.get(user_id);
         if (!user) {
             res.status(404).json({ error: 'User not found' });
@@ -31,6 +39,59 @@ router.get('/', fetchUser, async (req, res) => {
 });
 
 
+// Get a player token for a specific player
+router.get("/:playerId", fetchUser, async (req, res) => {
+    try {
+        if (!req.user || !req.user.id) {
+            res.status(401).send("Unauthorized");
+            return;
+        }
+        
+        const user = await User.get(req.user.id);
+        if (!user) {
+            res.status(404).send("User not found");
+            return;
+        }
+        
+        const playerId = req.params.playerId;
+        const players = await user.getPlayers();
+
+        // Check if the playerId belongs to the user
+        const playerIds = players.map((player: any) => player.id);
+        if (!playerIds.includes(playerId)) {
+            res.status(403).send("Forbidden");
+            return;
+        }
+
+        const playerToken = jwt.sign({ playerId, userId: user.id }, process.env.JWT_SECRET as string);
+        res.json({ playerToken });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send("Internal server error");
+    }
+})
+
+
+// Get Public Player data
+router.get("/:playerId/public", async (req, res) => {
+    try {
+        const playerId = req.params.playerId;
+        const player = await Player.get(playerId);
+
+        if (!player) {
+            res.status(404).send("Player not found");
+            return;
+        }
+
+        res.json(player.getPublicData());
+    } catch (error) {
+        console.error(error);
+        res.status(500).send("Internal server error");
+    }
+})
+
+
+// Create a new user
 router.post("/", async (req, res) => {
     try {
         const {name, email, password} = req.body;
@@ -69,6 +130,7 @@ router.post("/", async (req, res) => {
 })
 
 
+// User login
 router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -98,6 +160,8 @@ router.post("/login", async (req, res) => {
     }
 })
 
+
+// Update user data
 router.put("/", fetchUser, async (req, res) => {
     try {
         await User.update(req.user!.id, req.body);

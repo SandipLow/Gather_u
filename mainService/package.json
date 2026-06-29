@@ -1,0 +1,39 @@
+{
+    "name": "main_service",
+    "version": "1.0.0",
+    "scripts": {
+        "dev": "PORT=3001 tsc-watch --onSuccess \"node dist/index.js\"",
+        "dev:s2": "PORT=3002 tsc-watch --onSuccess \"node dist/index.js\"",
+        "dev:s3": "PORT=3003 tsc-watch --onSuccess \"node dist/index.js\"",
+        "build": "tsc -b",
+        "start": "node dist/index.js"
+    },
+    "dependencies": {
+        "bcrypt": "^6.0.0",
+        "cors": "^2.8.5",
+        "dotenv": "^17.2.0",
+        "express": "^4.21.1",
+        "firebase": "^11.10.0",
+        "http-proxy-middleware": "^4.1.1",
+        "ioredis": "^5.4.1",
+        "jsonwebtoken": "^9.0.2",
+        "uuid": "^11.0.3",
+        "ws": "^8.18.0"
+    },
+    "devDependencies": {
+        "@types/bcrypt": "^5.0.2",
+        "@types/cors": "^2.8.17",
+        "@types/express": "^5.0.0",
+        "@types/express-ws": "^3.0.5",
+        "@types/ioredis": "^5.0.0",
+        "@types/jsonwebtoken": "^9.0.10",
+        "@types/ws": "^8.5.12",
+        "nodemon": "^3.1.10",
+        "ts-node": "^10.9.2",
+        "tsc": "^2.0.4",
+        "tsc-watch": "^7.2.0",
+        "typescript": "^5.8.3"
+    },
+    "main": "dist/index.js",
+    "license": "MIT"
+}

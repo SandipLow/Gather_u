@@ -1,23 +1,28 @@
 import Phaser from 'phaser';
 import { OtherPlayer, Player } from './Player';
 import { sprites } from './assets';
-import { connectToWebSocket } from '../lib/websocket';
+import WebSocketClient, { connectToWebSocket } from '../lib/websocket';
+import { getPlayerData } from '../lib/api';
 
 export default class CityScene extends Phaser.Scene {
     private player: Player | null = null;
+    private moveBuffer = new Map<string, {
+        prev: { x: number; y: number; animation: string; timestamp: number };
+        next: { x: number; y: number; animation: string; timestamp: number };
+    }>();
     private otherPlayers: { [key: string]: OtherPlayer } = {};
     private map: Phaser.Tilemaps.Tilemap | null = null;
-    private socket: WebSocket | null = null;
+    private socket: WebSocketClient | null = null;
     private playerData!: PlayerData;
-    private overlay!: Phaser.GameObjects.Graphics;
-    private overlayMask!: Phaser.GameObjects.Graphics;
+    private overlay: Phaser.GameObjects.Graphics | null = null;
+    private overlayMask: Phaser.GameObjects.Graphics | null = null;
     private nears: Set<OtherPlayer> = new Set();
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
-    private chatInput!: Phaser.GameObjects.DOMElement;
-    private leftButton!: Phaser.GameObjects.Text;
-    private rightButton!: Phaser.GameObjects.Text;
-    private upButton!: Phaser.GameObjects.Text;
-    private downButton!: Phaser.GameObjects.Text;
+    private chatInput: Phaser.GameObjects.DOMElement | null = null;
+    private leftButton: Phaser.GameObjects.Text | null = null;
+    private rightButton: Phaser.GameObjects.Text | null = null;
+    private upButton: Phaser.GameObjects.Text | null = null;
+    private downButton: Phaser.GameObjects.Text | null = null;
 
     constructor() {
         super('CityScene');
@@ -38,7 +43,7 @@ export default class CityScene extends Phaser.Scene {
         }
     }
 
-    create() {
+    async create() {
         // Load the tilemap
         this.map = this.make.tilemap({ key: 'city_map', tileWidth: 16, tileHeight: 16 });
         const tileset = this.map.addTilesetImage('tileset', 'tiles');
@@ -62,76 +67,28 @@ export default class CityScene extends Phaser.Scene {
         trees.setCollisionByProperty({ collides: true });
 
 
-        // Connect to the server
-        this.socket = connectToWebSocket();
-
-        this.socket.onopen = () => {
-            console.log('Connected to server');
-
-            if (this.socket && this.playerData) {
-                this.socket.send(JSON.stringify({ type: 'enter_world', payload: { player_id: this.playerData.id } }));
-            }
-
-        }
-
-        this.socket.onmessage = (event) => {
-            const { type, payload } = JSON.parse(event.data.toString());
-
-            // Listen for player enter world events
-            if (type === 'enter_world') {
-                const { player } = payload;
-                this.addOtherPlayer({
-                    ...player,
-                    position: player.position || player.checkpoint
-                });
-            }
-
-            // Listen for player movement events
-            else if (type === 'move') {
-                const { player_id, data: { x, y, animation, timestamp } } = payload;
-                if (this.otherPlayers[player_id]) {
-                    this.otherPlayers[player_id].update(animation, x, y, timestamp);
-                }
-            }
-
-            // Listen for player leave world events
-            else if (type === 'leave_world') {
-                const { player_id } = payload;
-                if (this.otherPlayers[player_id]) {
-                    this.otherPlayers[player_id].destroy();
-                    this.nears.delete(this.otherPlayers[player_id]);
-                    delete this.otherPlayers[player_id];
-                }
-            }
-
-            else if (type === 'talk') {
-                const { from, message } = payload;
-                if (this.otherPlayers[from]) {
-                    this.otherPlayers[from].showChatMessage(message);
-                }
-            }
-        }
+        // Connect to WebSocket server
+        this.socket = await WebSocketClient.create(
+            this.playerData.id,
+            this.#handleEnter.bind(this),
+            this.#handleLeave.bind(this),
+            this.#handleMove.bind(this),
+            this.#handleTalk.bind(this)
+        );
 
         // reconnect on close
-        this.socket.onclose = () => {
+        this.socket.socket.onclose = () => {
             this.scene.restart(this.playerData);
             console.log('Disconnected from server, attempting to reconnect...');;
         }
 
         this.events.on('shutdown', () => {
-            if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-                this.socket.send(JSON.stringify({ type: 'leave_world', payload: { player_id: this.playerData.id } }));
-                this.socket.close();
-            }
+            this.socket?.onClose();
         });
 
         this.events.on('destroy', () => {
-            if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-                this.socket.send(JSON.stringify({ type: 'leave_world', payload: { player_id: this.playerData.id } }));
-                this.socket.close();
-            }
+            this.socket?.onClose();
         });
-
 
 
         // Create player
@@ -277,61 +234,108 @@ export default class CityScene extends Phaser.Scene {
     }
 
     update() {
-        // Clear overlay and overlay mask each frame
-        this.overlay.clear();
-        this.overlay.clearMask();
-        this.overlayMask.clear();
+        this.overlay?.clear();
+        this.overlay?.clearMask();
+        this.overlayMask?.clear();
 
         if (this.player) {
-            this.player.update(this.socket);
+            this.player.update();
 
             for (const playerId in this.otherPlayers) {
                 const otherPlayer = this.otherPlayers[playerId];
                 const isNear = otherPlayer.checkProximity(this.player);
-
-                if (isNear) {
-                    this.nears.add(otherPlayer);
-                }
-                else {
-                    this.nears.delete(otherPlayer);
-                }
+                if (isNear) this.nears.add(otherPlayer);
+                else        this.nears.delete(otherPlayer);
             }
         }
 
+        // Interpolate other players every frame
+        this.#tickInterpolation();
+
         if (this.nears.size > 0) {
-            this.overlay.fillStyle(0x000000, 0.7);
-            this.overlay.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height);
+            this.overlay?.fillStyle(0x000000, 0.7);
+            this.overlay?.fillRect(0, 0, this.cameras.main.width, this.cameras.main.height);
 
             for (const otherPlayer of this.nears) {
-                this.overlayMask.fillStyle(0xffffff, 1);
-                this.overlayMask.fillCircle(
-                    otherPlayer.getPlayerData().position.x,
-                    otherPlayer.getPlayerData().position.y,
+                this.overlayMask?.fillStyle(0xffffff, 1);
+                this.overlayMask?.fillCircle(
+                    otherPlayer.getPosition().x,
+                    otherPlayer.getPosition().y,
                     50
                 );
             }
 
-            const mask = this.overlayMask.createGeometryMask();
-            mask.invertAlpha = true;
-            this.overlay.setMask(mask);
-
+            const mask = this.overlayMask?.createGeometryMask();
+            if (mask) {
+                mask.invertAlpha = true;
+                this.overlay?.setMask(mask);
+            }
             this.#renderChatInput();
-        }
-
-        else {
+        } else {
             this.#hideChatInput();
         }
 
+        // update lasttimestamp so throttle actually works
+        const now = Date.now();
+        if (this.player && this.socket && now - this.player.lasttimestamp >= 100) {
+            this.player.lasttimestamp = now;
+            this.socket?.sendMove(
+                this.player.getPosition().x,
+                this.player.getPosition().y,
+                this.player.getAnimation() || '',
+                now
+            );
+        }
+    }
+    
+    #handleEnter (playerId: string) {
+        getPlayerData(playerId)
+            .then((playerData) => {
+                this.addOtherPlayer({
+                    ...playerData,
+                    position: playerData.position || playerData.checkpoint
+                });
+            })
+            .catch((error) => {
+                console.error(`Failed to fetch player data for ${playerId}:`, error);
+            });
+    }
+
+    #handleLeave(playerId: string) {
+        if (this.otherPlayers[playerId]) {
+            this.otherPlayers[playerId].destroy();
+            this.nears.delete(this.otherPlayers[playerId]);
+            delete this.otherPlayers[playerId];
+            this.moveBuffer.delete(playerId); // ← clean up buffer
+        }
+    }
+
+    #handleMove(playerId: string, x: number, y: number, animation: string, timestamp: number) {
+        if (!this.otherPlayers[playerId]) return;
+
+        const receivedAt = Date.now(); // ← when WE received it, not when they sent it
+        const existing = this.moveBuffer.get(playerId);
+
+        this.moveBuffer.set(playerId, {
+            prev: existing?.next ?? { x, y, animation, timestamp: receivedAt },
+            next: { x, y, animation, timestamp: receivedAt } // ← use local time
+        });
+    }
+
+    #handleTalk (playerId: string, message: string) {
+        if (this.otherPlayers[playerId]) {
+            this.otherPlayers[playerId].showChatMessage(message);
+        }
     }
 
     #renderChatInput() {
-        if (this.chatInput.visible) return;
-        this.chatInput.setVisible(true);
+        if (this.chatInput?.visible) return;
+        this.chatInput?.setVisible(true);
     }
 
     #hideChatInput() {
-        if (!this.chatInput.visible) return;
-        this.chatInput.setVisible(false);
+        if (!this.chatInput?.visible) return;
+        this.chatInput?.setVisible(false);
     }
 
     addOtherPlayer(playerData: any) {
@@ -339,12 +343,7 @@ export default class CityScene extends Phaser.Scene {
     }
 
     #handleMessage(msg: string) {
-        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            this.socket.send(JSON.stringify({
-                type: 'talk',
-                payload: { from: this.playerData.id, players: Array.from(this.nears).map(plr => plr.getPlayerData().id), message: msg }
-            }));
-        }
+        this.socket?.sendTalk(Array.from(this.nears).map(plr => plr.getPlayerData().id), msg);
     }
 
     #adjustUIElements() {
@@ -366,22 +365,40 @@ export default class CityScene extends Phaser.Scene {
         }
 
         const chatInputPosition = getPosition(50, 80);
-        this.chatInput.setPosition(chatInputPosition.x, chatInputPosition.y);
+        this.chatInput?.setPosition(chatInputPosition.x, chatInputPosition.y);
 
         const { x: baseX, y: baseY } = getPosition(15, 50);
         const size = 10;
         const margin = 10;
         
-        this.leftButton.setPosition(baseX - size - margin, baseY);
-        this.rightButton.setPosition(baseX + size + margin, baseY);
-        this.upButton.setPosition(baseX, baseY - size - margin);
-        this.downButton.setPosition(baseX, baseY + size + margin);
+        this.leftButton?.setPosition(baseX - size - margin, baseY);
+        this.rightButton?.setPosition(baseX + size + margin, baseY);
+        this.upButton?.setPosition(baseX, baseY - size - margin);
+        this.downButton?.setPosition(baseX, baseY + size + margin);
 
         [this.leftButton, this.rightButton, this.upButton, this.downButton].forEach(btn => {
-            btn.setOrigin(0.5);
-            btn.setScrollFactor(0);
-            btn.setDepth(1000);
+            btn?.setOrigin(0.5);
+            btn?.setScrollFactor(0);
+            btn?.setDepth(1000);
         });
+    }
+
+    private INTERP_DURATION = 120; // ms
+
+    #tickInterpolation() {
+        const now = Date.now();
+        for (const [playerId, { prev, next }] of this.moveBuffer) {
+            const player = this.otherPlayers[playerId];
+            if (!player) continue;
+
+            // Interpolate over a fixed window from when next arrived
+            const t = Math.min((now - next.timestamp) / this.INTERP_DURATION, 1);
+
+            const x = prev.x + (next.x - prev.x) * t;
+            const y = prev.y + (next.y - prev.y) * t;
+
+            player.update(next.animation, x, y, now);
+        }
     }
 }
 

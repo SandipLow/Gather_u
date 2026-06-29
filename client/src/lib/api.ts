@@ -35,3 +35,41 @@ export const login = async (email: string, password: string) => {
 
     return data
 }
+
+export const getPlayerData = async (playerId: string) => {
+    const res = await fetch(`${API_URL}/user/${playerId}/public`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    });
+
+    if (!res.ok) {
+        throw new Error(`Failed to fetch player data for ${playerId}`);
+    }
+
+    return res.json();
+}
+
+export const getPlayerToken = async (playerId: string) => {
+    const auth = localStorage.getItem("auth");
+    if (!auth) {
+        throw new Error('User not authenticated');
+    }
+
+    const {token} = JSON.parse(auth);
+    const res = await fetch(`${API_URL}/user/${playerId}`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        },
+    });
+
+    if (!res.ok) {
+        throw new Error(`Failed to fetch player token for ${playerId}`);
+    }
+
+    const data = await res.json();
+    return data.playerToken;
+}

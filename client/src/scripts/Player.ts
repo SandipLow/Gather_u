@@ -5,9 +5,10 @@ export class Player extends Phaser.GameObjects.GameObject {
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
     public scene: Phaser.Scene;
     private playerData: PlayerData;
+    private position: { x: number, y: number } = { x: 0, y: 0 };
     private animation: string | null = null;
     private animationPrefix: string;
-    private lastSentTime = 0;
+    public lasttimestamp: number = 0;
 
     constructor(scene: Phaser.Scene, playerData: PlayerData, cursors: Phaser.Types.Input.Keyboard.CursorKeys | null) {
         super(scene, 'Player');
@@ -46,7 +47,7 @@ export class Player extends Phaser.GameObjects.GameObject {
     }
 
     // Update method for movement and animations
-    update(socket: WebSocket | null) {
+    update() {
         this.sprite.setVelocity(0);
 
         if (this.cursors) {
@@ -76,28 +77,18 @@ export class Player extends Phaser.GameObjects.GameObject {
             }
         }
 
-        this.playerData.position = {
+        this.position = {
             x: this.sprite.x,
             y: this.sprite.y
         };
+    }
 
-        // Throttle to 10 updates per second (every 100ms)
-        const now = Date.now();
-        if (socket && socket.readyState === WebSocket.OPEN && now - this.lastSentTime >= 30) {
-            socket.send(JSON.stringify({
-                type: 'move',
-                payload: {
-                    player_id: this.playerData.id,
-                    data: {
-                        x: this.sprite.x,
-                        y: this.sprite.y,
-                        animation: this.animation ?? null,
-                        timestamp: now
-                    }
-                }
-            }));
-            this.lastSentTime = now;
-        }
+    getPosition() {
+        return this.position;
+    }
+
+    getAnimation() {
+        return this.animation;
     }
 
     getSprite() {
@@ -115,6 +106,7 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
     private sprite?: Phaser.Physics.Arcade.Sprite;
     public scene: Phaser.Scene;
     private playerData: PlayerData;
+    private position: { x: number, y: number } = { x: 0, y: 0 };
     private animationPrefix: string;
     public lasttimestamp: number = 0;
 
@@ -160,7 +152,7 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
         if (timestamp < this.lasttimestamp) return;
 
         this.lasttimestamp = timestamp;
-        this.playerData.position = { x, y };
+        this.position = { x, y };
 
         if (!this.sprite) return;
 
@@ -177,8 +169,8 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
 
     checkProximity(player: Player) {
         const distance = Phaser.Math.Distance.Between(
-            this.playerData.position.x,
-            this.playerData.position.y,
+            this.position.x,
+            this.position.y,
             player.getSprite().x,
             player.getSprite().y
         );
@@ -197,6 +189,10 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
 
     getPlayerData() {
         return this.playerData;
+    }
+
+    getPosition() {
+        return this.position;
     }
 
     showChatMessage(message: string) {
@@ -226,8 +222,8 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
         if (this.sprite) return;
 
         this.sprite = this.scene.physics.add.sprite(
-            this.playerData.position.x,
-            this.playerData.position.y,
+            this.position.x,
+            this.position.y,
             this.playerData.spritesheet
         );
     }

@@ -8,24 +8,37 @@ Gather_u is a browser-based multiplayer RPG where players can create characters,
 
 ## 🏗️ Architecture
 
-![Architecture Diagram](/doc/architecture.png)
-
-The project follows a client-server architecture:
+The current codebase is split into three runnable parts:
 
 ### Client (`/client`)
 
 - **Framework**: Svelte + TypeScript + Vite
-- **Game Engine**: Phaser.js for 2D game rendering and physics
-- **Styling**: Component-scoped CSS
-- **Build Tool**: Vite for fast development and optimized builds
+- **Game Runtime**: Phaser.js for 2D rendering, movement, and scene logic
+- **Responsibilities**: UI, game screens, asset loading, and WebSocket connection handling
 
-### Server (`/server`)
+### Main Service (`/mainService`)
 
 - **Runtime**: Node.js + TypeScript
 - **Web Framework**: Express.js for HTTP endpoints
-- **Real-time Communication**: WebSocket for live player interactions
-- **Database**: Redis for session management and real-time data
-- **Architecture**: RESTful API + WebSocket events
+- **Real-time Layer**: WebSocket server for live player state and chat
+- **Coordination**: Redis pub/sub for cross-instance message fan-out and a game loop for movement updates
+- **Auth Flow**: Issues and verifies player session tokens before allowing socket connections
+- **API Role**: Proxies `/user` requests to the player service REST API
+
+### Player Service (`/playerService`)
+
+- **Runtime**: Node.js + TypeScript
+- **Web Framework**: Express.js for user, auth, and player REST endpoints
+- **RPC Layer**: gRPC service for player/world operations used by the main service
+- **Persistence**: Database-backed user, player, and world models
+- **Auth Flow**: Issues user tokens and player tokens for game access
+
+### Service Boundaries
+
+- The client talks to the main service over HTTP and WebSocket.
+- The main service talks to the player service over REST for user data and over gRPC for player/world operations.
+- Redis is used by the main service to forward gameplay events between running instances.
+
 
 ## 🚀 Features (In Development)
 
@@ -50,23 +63,31 @@ The project follows a client-server architecture:
 
 ```
 Gather_u/
-├── client/                 # Frontend Svelte application
+├── client/                 # Svelte + Phaser frontend
+│   ├── assets/             # Game art, maps, and UI assets copied into builds
+│   ├── public/             # Static public files
 │   ├── src/
-│   │   ├── components/     # Reusable UI components
-│   │   ├── lib/           # Shared utilities and components
-│   │   ├── scripts/       # Game logic and Phaser scenes
-│   │   └── assets/        # Static assets
-│   ├── public/            # Public static files
-│   ├── assets/            # Game assets (sprites, maps, etc.)
+│   │   ├── lib/           # API and WebSocket helpers
+│   │   ├── scripts/       # Scene, asset, and player logic
+│   │   └── types/         # Global TypeScript declarations
 │   ├── package.json
-│   ├── vite.config.js
-│   └── svelte.config.js
-└── server/                # Backend Node.js application
+│   ├── svelte.config.js
+│   └── vite.config.ts
+├── mainService/            # HTTP + WebSocket game coordinator
+│   ├── proto/              # Shared gRPC definitions
+│   ├── src/
+│   │   ├── lib/           # Auth, Redis, WebSocket, and game loop helpers
+│   │   └── index.ts       # Main HTTP server entrypoint
+│   ├── package.json
+│   └── tsconfig.json
+└── playerService/          # User, player, and world backend
+    ├── proto/              # gRPC definitions
     ├── src/
+    │   ├── lib/           # Database and gRPC server helpers
+    │   ├── middlewares/   # Auth/session middleware
     │   ├── models/        # Data models
-    │   ├── types/         # TypeScript type definitions
-    │   ├── routes/        # API routes
-    │   └── res/           # Server resources
+    │   ├── routes/        # REST routes
+    │   └── index.ts       # Service entrypoint
     ├── package.json
     └── tsconfig.json
 ```
@@ -92,7 +113,29 @@ This project is currently in active development. Core systems being implemented 
 
 ## 🚦 Getting Started
 
-_Documentation for setup and development will be added as the project progresses._
+### Development
+
+Install dependencies in the root and each package, then start the three services together from the repository root:
+
+```bash
+yarn dev
+```
+
+Alternative environment presets are available with:
+
+```bash
+yarn dev:s2
+yarn dev:s3
+```
+
+Default local ports:
+
+- Client: `5173`
+- Main service: `3001`
+- Player service HTTP: `4001`
+- Player service gRPC: `50051`
+
+The variant scripts shift those ports to avoid conflicts when running multiple environments side by side.
 
 ## 📄 License
 

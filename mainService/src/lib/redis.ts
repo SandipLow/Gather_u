@@ -1,10 +1,11 @@
+const WORLDEVENT_CHANNEL = "world_event_channel";
+
 import Redis from "ioredis";
-import Strings from "../res/strings";
+
 
 export default class RedisPubSub {
     redisPub: Redis;
     redisSub: Redis;
-    private WorldEventChannel = Strings.REDIS_WORLD_EVENT_CHANNEL;
 
     constructor(
         serverid: string,
@@ -34,45 +35,24 @@ export default class RedisPubSub {
             host: redisUrl.split(':')[0]
         });
 
-        // Subscribe to relevant Redis channels. World events and own server communication channel
-        this.redisSub.subscribe(this.WorldEventChannel, RedisPubSub.getServerCommunicationChannel(serverid), (err, count) => {
+
+        this.redisSub.subscribe(WORLDEVENT_CHANNEL, (err, count) => {
             if (err) {
                 console.error('Failed to subscribe: ', err);
                 return;
             }
             console.log(`Subscribed successfully! This client is currently subscribed to ${count} channels.`);
-        });
+        })
 
-        // Handle incoming messages
         this.redisSub.on('message', handleMessage);
 
 
-        // Publish an initial message to the world event channel
-        this.redisPub.publish(this.WorldEventChannel, JSON.stringify({
-            type: Strings.WS_INIT,
-            payload: { serverid },
-            serverid
-        }));
-
-
-        // Handle Redis errors
         this.redisPub.on('error', handleError);
         this.redisSub.on('error', handleError);
     }
 
-    // Publish a message to the world
-    publishWorldEvent(data: any) {
-        this.redisPub.publish(this.WorldEventChannel, JSON.stringify(data));
-    }
-
-    // Publish a message to a specific server
-    publishServerEvent(serverid: string, data: any) {
-        this.redisPub.publish(RedisPubSub.getServerCommunicationChannel(serverid), JSON.stringify(data));
-    }
-
-    // Static method to get the server communication channel name
-    static getServerCommunicationChannel(serverid: string) {
-        return `server-communication-${serverid}`;
+    sendMessage(data: any) {
+        this.redisPub.publish(WORLDEVENT_CHANNEL, JSON.stringify(data));
     }
 
     quit() {

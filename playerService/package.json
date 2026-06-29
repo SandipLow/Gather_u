@@ -1,12 +1,10 @@
 {
-    "name": "gather_u_server",
+    "name": "player_service",
     "version": "1.0.0",
-    "description": "",
-    "private": true,
     "scripts": {
-        "dev": "tsc-watch --onSuccess \"node dist/index.js\"",
-        "dev:s2": "PORT=4000 tsc-watch --onSuccess \"node dist/index.js\"",
-        "dev:s3": "PORT=5000 tsc-watch --onSuccess \"node dist/index.js\"",
+        "dev": "PORT=4001 GRPC_PORT=50051 tsc-watch --onSuccess \"node dist/index.js\"",
+        "dev:s2": "PORT=4002 GRPC_PORT=50052 tsc-watch --onSuccess \"node dist/index.js\"",
+        "dev:s3": "PORT=4003 GRPC_PORT=50053 tsc-watch --onSuccess \"node dist/index.js\"",
         "build": "tsc -b",
         "start": "node dist/index.js"
     },
@@ -16,6 +14,7 @@
         "dotenv": "^17.2.0",
         "express": "^4.21.1",
         "firebase": "^11.10.0",
+        "grpc": "^1.24.11",
         "ioredis": "^5.4.1",
         "jsonwebtoken": "^9.0.2",
         "uuid": "^11.0.3",
@@ -32,6 +31,7 @@
         "nodemon": "^3.1.10",
         "ts-node": "^10.9.2",
         "tsc": "^2.0.4",
+        "tsc-watch": "^7.2.0",
         "typescript": "^5.8.3"
     },
     "main": "dist/index.js",

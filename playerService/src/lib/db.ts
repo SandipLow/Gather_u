@@ -14,5 +14,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+export enum Collections {
+    USERS = "Users",
+    WORLDS = "Worlds",
+    PLAYERS = "Players"
+}
+
 
 export default db;

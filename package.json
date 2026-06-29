@@ -1,9 +1,9 @@
 {
     "name": "gather_u",
     "scripts": {
-        "dev": "cd server && yarn dev & cd client && yarn dev --host",
-        "dev:s2": "cd server && yarn dev:s2 & cd client && yarn dev:s2 --host",
-        "dev:s3": "cd server && yarn dev:s3 & cd client && yarn dev:s3 --host"
+        "dev": "cd playerService && yarn dev & cd mainService && yarn dev & cd client && yarn dev --host",
+        "dev:s2": "cd playerService && yarn dev:s2 & cd mainService && yarn dev:s2 & cd client && yarn dev:s2 --host",
+        "dev:s3": "cd playerService && yarn dev:s3 & cd mainService && yarn dev:s3 & cd client && yarn dev:s3 --host"
     },
     "version": "1.0.0",
     "main": "index.js",
