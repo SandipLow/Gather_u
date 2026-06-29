@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+**/.DS_Store
+.git
+.gitignore
+client/node_modules
+mainService/node_modules
+playerService/node_modules

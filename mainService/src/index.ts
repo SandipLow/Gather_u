@@ -42,3 +42,14 @@ const socket = new SocketServer(server, playerService);
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+function shutdown(signal: string) {
+    console.log(`${signal} received — shutting down main service...`);
+    server.close(() => {
+        console.log("Main service HTTP server closed.");
+        process.exit(0);
+    });
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

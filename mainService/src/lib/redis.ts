@@ -6,6 +6,9 @@ import Redis from "ioredis";
 export default class RedisPubSub {
     redisPub: Redis;
     redisSub: Redis;
+    isReady = false;
+    private readonly readyPromise: Promise<void>;
+    private subscribed = false;
 
     constructor(
         serverid: string,
@@ -16,39 +19,53 @@ export default class RedisPubSub {
         const redisUsername = process.env.REDIS_USERNAME;
         const redisPassword = process.env.REDIS_PASSWORD;
 
-        if (!redisUrl || !redisUsername || !redisPassword) {
+        if (!redisUrl) {
             console.error('Redis URI not provided');
             process.exit(1);
         }
 
-        this.redisPub = new Redis({
-            // username: redisUsername,
-            // password: redisPassword,
-            port: parseInt(redisUrl.split(':')[1]),
-            host: redisUrl.split(':')[0],
+        const [host, portText] = redisUrl.split(':');
+        const redisConfig = {
+            host,
+            port: parseInt(portText),
+            ...(redisUsername ? { username: redisUsername } : {}),
+            ...(redisPassword ? { password: redisPassword } : {}),
+        };
+
+        this.redisPub = new Redis(redisConfig);
+        this.redisSub = new Redis(redisConfig);
+
+        this.readyPromise = new Promise((resolve) => {
+            this.redisSub.on("ready", async () => {
+                try {
+                    if (!this.subscribed) {
+                        const count = await this.redisSub.subscribe(WORLDEVENT_CHANNEL);
+                        this.subscribed = true;
+                        console.log(`Subscribed successfully! This client is currently subscribed to ${count} channels.`);
+                        resolve();
+                    }
+
+                    this.isReady = true;
+                } catch (err) {
+                    this.isReady = false;
+                    console.error("Failed to subscribe:", err);
+                }
+            });
         });
 
-        this.redisSub = new Redis({
-            // username: redisUsername,
-            // password: redisPassword,
-            port: parseInt(redisUrl.split(':')[1]),
-            host: redisUrl.split(':')[0]
-        });
-
-
-        this.redisSub.subscribe(WORLDEVENT_CHANNEL, (err, count) => {
-            if (err) {
-                console.error('Failed to subscribe: ', err);
-                return;
-            }
-            console.log(`Subscribed successfully! This client is currently subscribed to ${count} channels.`);
-        })
+        this.redisSub.on("reconnecting", () => { this.isReady = false; });
+        this.redisSub.on("close", () => { this.isReady = false; });
+        this.redisSub.on("end", () => { this.isReady = false; });
 
         this.redisSub.on('message', handleMessage);
 
 
         this.redisPub.on('error', handleError);
         this.redisSub.on('error', handleError);
+    }
+
+    whenReady(): Promise<void> {
+        return this.readyPromise;
     }
 
     sendMessage(data: any) {

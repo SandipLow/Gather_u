@@ -10,6 +10,8 @@ Gather_u is a browser-based multiplayer RPG where players can create characters,
 
 The current codebase is split into three runnable parts:
 
+!["Architecture Diagram"](doc/architecture.png)
+
 ### Client (`/client`)
 
 - **Framework**: Svelte + TypeScript + Vite
@@ -136,6 +138,22 @@ Default local ports:
 - Player service gRPC: `50051`
 
 The variant scripts shift those ports to avoid conflicts when running multiple environments side by side.
+
+### Docker
+
+The main service, player service, and Redis can also run inside one container. Build the backend image with:
+
+```bash
+yarn docker:build
+```
+
+Then run it with the ports exposed for the main HTTP API, player REST API, and gRPC API:
+
+```bash
+yarn docker:run
+```
+
+The container expects the same runtime secrets and infrastructure as the local services, including `JWT_SECRET`. Redis is started locally inside the container and the main service defaults to `127.0.0.1:6379`.
 
 ## 📄 License
 

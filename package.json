@@ -3,7 +3,11 @@
     "scripts": {
         "dev": "cd playerService && yarn dev & cd mainService && yarn dev & cd client && yarn dev --host",
         "dev:s2": "cd playerService && yarn dev:s2 & cd mainService && yarn dev:s2 & cd client && yarn dev:s2 --host",
-        "dev:s3": "cd playerService && yarn dev:s3 & cd mainService && yarn dev:s3 & cd client && yarn dev:s3 --host"
+        "dev:s3": "cd playerService && yarn dev:s3 & cd mainService && yarn dev:s3 & cd client && yarn dev:s3 --host",
+        "build": "cd playerService && yarn build & cd mainService && yarn build & cd client && yarn build",
+        "start": "cd playerService && yarn start & cd mainService && yarn start & cd client && yarn preview --host",
+        "docker:build": "docker build -t gather_u-backend .",
+        "docker:run": "docker run --rm -p 3001:3001 -p 4001:4001 -p 50051:50051 -p 6379:6379 gather_u-backend"
     },
     "version": "1.0.0",
     "main": "index.js",

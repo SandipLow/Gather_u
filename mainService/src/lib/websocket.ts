@@ -74,6 +74,12 @@ export default class SocketServer {
     // ─── Connection lifecycle ────────────────────────────────────────────────
 
     onConnection(ws: WebSocket, req: IncomingMessage) {
+        if (!this.redisPubSub.isReady) {
+            ws.send(JSON.stringify({ type: "error", payload: { message: "Service unavailable." } }));
+            ws.close();
+            return;
+        }
+
         const url   = new URL(req.url!, `http://${req.headers.host}`);
         const token = url.searchParams.get("token");
         let playerId: string;

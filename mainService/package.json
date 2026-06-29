@@ -6,9 +6,11 @@
         "dev:s2": "PORT=3002 tsc-watch --onSuccess \"node dist/index.js\"",
         "dev:s3": "PORT=3003 tsc-watch --onSuccess \"node dist/index.js\"",
         "build": "tsc -b",
-        "start": "node dist/index.js"
+        "start": "PORT=3001 node dist/index.js"
     },
     "dependencies": {
+        "@grpc/grpc-js": "^1.13.4",
+        "@grpc/proto-loader": "^0.7.15",
         "bcrypt": "^6.0.0",
         "cors": "^2.8.5",
         "dotenv": "^17.2.0",
