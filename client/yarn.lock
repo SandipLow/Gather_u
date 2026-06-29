@@ -489,6 +489,11 @@ svelte-check@^4.0.5:
     picocolors "^1.0.0"
     sade "^1.7.4"
 
+svelte-routing@^2.13.0:
+  version "2.13.0"
+  resolved "https://registry.yarnpkg.com/svelte-routing/-/svelte-routing-2.13.0.tgz#d8215a55491e32203d4eaeda20b313dd257bdce7"
+  integrity sha512-/NTxqTwLc7Dq306hARJrH2HLXOBtKd7hu8nxgoFDlK0AC4SOKnzisiX/9m8Uksei1QAWtlAEdF91YphNM8iDMg==
+
 svelte@^5.0.3:
   version "5.1.2"
   resolved "https://registry.yarnpkg.com/svelte/-/svelte-5.1.2.tgz#6aa4cc97bc501654c8ade65fb026a1a2cd6723b5"

@@ -2,7 +2,7 @@
     "name": "main_service",
     "version": "1.0.0",
     "scripts": {
-        "dev": "PORT=3001 tsc-watch --onSuccess \"node dist/index.js\"",
+        "dev": "tsc-watch --onSuccess \"node dist/index.js\"",
         "dev:s2": "PORT=3002 tsc-watch --onSuccess \"node dist/index.js\"",
         "dev:s3": "PORT=3003 tsc-watch --onSuccess \"node dist/index.js\"",
         "build": "tsc -b",

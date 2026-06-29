@@ -1,4 +1,5 @@
 import { getPlayerToken } from "./api";
+import { authState } from "./auth.svelte";
 
 export const connectToWebSocket = () => {
     const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3000';
@@ -67,7 +68,7 @@ export default class WebSocketClient {
         handleMove: (playerId: string, x: number, y: number, animation: string, timestamp: number) => void,
         handleTalk: (playerId: string, message: string) => void
     ) {
-        const token = await getPlayerToken(playerId);
+        const token = await authState.getPlayerToken(playerId);
         const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3000';
         const socket = new WebSocket(`${wsUrl}?token=${token}`);
         return new WebSocketClient(socket, handleEnter, handleLeave, handleMove, handleTalk);

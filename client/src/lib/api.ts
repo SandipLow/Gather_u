@@ -1,12 +1,6 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-export const fetchUserData = async ()=> {
-    const auth = localStorage.getItem("auth");
-    if (!auth) {
-        throw new Error('User not authenticated');
-    }
-
-    const {token} = JSON.parse(auth);
+export const fetchUserData = async (token: string) => {
     const res = await fetch(`${API_URL}/user/`, {
         method: 'GET',
         headers: {
@@ -30,10 +24,23 @@ export const login = async (email: string, password: string) => {
         throw new Error('Login failed');
     }
 
-    const data = await res.json();
-    localStorage.setItem("auth", JSON.stringify(data));
+    return res.json();
+}
 
-    return data
+export const register = async (name: string, email: string, password: string) => {
+    const res = await fetch(`${API_URL}/user`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, password }),
+    });
+
+    if (!res.ok) {
+        throw new Error('Registration failed');
+    }
+
+    return res.json();
 }
 
 export const getPlayerData = async (playerId: string) => {
@@ -51,13 +58,7 @@ export const getPlayerData = async (playerId: string) => {
     return res.json();
 }
 
-export const getPlayerToken = async (playerId: string) => {
-    const auth = localStorage.getItem("auth");
-    if (!auth) {
-        throw new Error('User not authenticated');
-    }
-
-    const {token} = JSON.parse(auth);
+export const getPlayerToken = async (playerId: string, token: string) => {
     const res = await fetch(`${API_URL}/user/${playerId}`, {
         method: 'GET',
         headers: {
@@ -70,6 +71,5 @@ export const getPlayerToken = async (playerId: string) => {
         throw new Error(`Failed to fetch player token for ${playerId}`);
     }
 
-    const data = await res.json();
-    return data.playerToken;
+    return res.json();
 }

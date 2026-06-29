@@ -1,8 +1,20 @@
 <script lang="ts">
-  import Game from "./Game.svelte";
-    
+    import { Router, Route } from "svelte-routing";
+    import Home from "./pages/Home.svelte";
+    import Auth from "./pages/Auth.svelte";
+    import Game from "./pages/Game.svelte";
+    import AuthenticatedPage from "./components/AuthenticatedPage.svelte";
 </script>
 
-<main>
-    <Game />
-</main>
+<Router>
+    <Route path="/">
+        <AuthenticatedPage>
+            <Game />
+        </AuthenticatedPage>
+    </Route>
+
+    <Route path="/auth">
+        <Auth />
+    </Route>
+
+</Router>

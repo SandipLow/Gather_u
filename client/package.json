@@ -7,7 +7,6 @@
     "dev": "vite",
     "dev:s2": "vite --mode s2 --port 5174",
     "dev:s3": "vite --mode s3 --port 5175",
-
     "build": "vite build && cp -a ./assets/* ./dist/assets",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.node.json"
@@ -17,6 +16,7 @@
     "@tsconfig/svelte": "^5.0.4",
     "svelte": "^5.0.3",
     "svelte-check": "^4.0.5",
+    "svelte-routing": "^2.13.0",
     "tslib": "^2.8.0",
     "typescript": "~5.6.2",
     "vite": "^5.4.9"

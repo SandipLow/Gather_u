@@ -118,7 +118,8 @@ router.post("/", async (req, res) => {
         res.status(201).json({
             id: newUser.id,
             name: newUser.name,
-            email: newUser.email
+            email: newUser.email,
+            token: jwt.sign({ id: newUser.id }, process.env.JWT_SECRET!)
         });
 
         return;
