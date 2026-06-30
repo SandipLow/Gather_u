@@ -232,7 +232,28 @@ export default class World {
         await updateDoc(doc(db, Collections.WORLDS, id), worldData);
     }
 
+    static async searchByName(search: string) {
+        const q = query(
+            collection(db, Collections.WORLDS),
+            where("name", ">=", search),
+            where("name", "<=", search + "\uf8ff")
+        );
 
+        const res = await getDocs(q);
+
+        const worlds = res.docs.map(doc => {
+            return {id: doc.id, ...doc.data()} as WorldData;
+        });
+
+        return await Promise.all(worlds.map(async (worldData) => {
+            const players = await Player.getByWorldId(worldData.id);
+            return {
+                ...worldData,
+                playersCount: players.length,
+                onlinePlayers: players.map(p => p.exportData())
+            } as WorldDataWithPlayers;
+        }));
+    }
 
 
 }

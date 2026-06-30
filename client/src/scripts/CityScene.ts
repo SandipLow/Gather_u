@@ -3,6 +3,7 @@ import { OtherPlayer, Player } from './Player';
 import { sprites } from './assets';
 import WebSocketClient, { connectToWebSocket } from '../lib/websocket';
 import { getPlayerData } from '../lib/api';
+import { navigate } from 'svelte-routing';
 
 export default class CityScene extends Phaser.Scene {
     private player: Player | null = null;
@@ -39,11 +40,11 @@ export default class CityScene extends Phaser.Scene {
 
         // Preload all character sprites
         for (const sprite in sprites) {
-            this.load.spritesheet(sprite, sprites[sprite].path, { frameWidth: 16, frameHeight: 16 });
+            this.load.spritesheet(sprite, sprites[sprite], { frameWidth: 16, frameHeight: 16 });
         }
     }
 
-    async create() {
+    create() {
         // Load the tilemap
         this.map = this.make.tilemap({ key: 'city_map', tileWidth: 16, tileHeight: 16 });
         const tileset = this.map.addTilesetImage('tileset', 'tiles');
@@ -68,28 +69,34 @@ export default class CityScene extends Phaser.Scene {
 
 
         // Connect to WebSocket server
-        this.socket = await WebSocketClient.create(
+        WebSocketClient.create(
             this.playerData.id,
             this.#handleEnter.bind(this),
             this.#handleLeave.bind(this),
             this.#handleMove.bind(this),
             this.#handleTalk.bind(this)
-        );
+        ).then(socket => {
+            this.socket = socket;
 
-        // reconnect on close
-        this.socket.socket.onclose = () => {
-            this.scene.restart(this.playerData);
-            console.log('Disconnected from server, attempting to reconnect...');;
-        }
+            // reconnect on close
+            socket.socket.onclose = () => {
+                this.scene.restart(this.playerData);
+                console.log('Disconnected from server, attempting to reconnect...');;
+            }
 
-        this.events.on('shutdown', () => {
-            this.socket?.onClose();
+            this.events.on('shutdown', () => {
+                socket.onClose();
+            });
+
+            this.events.on('destroy', () => {
+                socket.onClose();
+            });
+        }).catch(err => {
+            console.error("Failed to connect to WebSocket server:", err);
+            setTimeout(() => {
+                this.scene.restart(this.playerData);
+            }, 2000);
         });
-
-        this.events.on('destroy', () => {
-            this.socket?.onClose();
-        });
-
 
         // Create player
         this.cursors = this.input.keyboard ? this.input.keyboard.createCursorKeys() : null;
@@ -182,7 +189,7 @@ export default class CityScene extends Phaser.Scene {
         };
 
         // Create buttons
-        this.leftButton = this.add.text(0,0, '◀', buttonStyle).setInteractive();
+        this.leftButton = this.add.text(0, 0, '◀', buttonStyle).setInteractive();
         this.rightButton = this.add.text(0, 0, '▶', buttonStyle).setInteractive();
         this.upButton = this.add.text(0, 0, '▲', buttonStyle).setInteractive();
         this.downButton = this.add.text(0, 0, '▼', buttonStyle).setInteractive();
@@ -192,7 +199,7 @@ export default class CityScene extends Phaser.Scene {
             btn.setScrollFactor(0);
             btn.setDepth(1000);
         });
-        
+
         if (this.sys.game.device.os.desktop) {
             // Hide buttons on desktop
             this.leftButton.setVisible(false);
@@ -206,20 +213,20 @@ export default class CityScene extends Phaser.Scene {
             this.rightButton.setVisible(true);
             this.upButton.setVisible(true);
             this.downButton.setVisible(true);
-            
+
             // Touch/hold handling
             this.leftButton.on('pointerdown', () => this.cursors ? this.cursors.left.isDown = true : null);
             this.leftButton.on('pointerup', () => this.cursors ? this.cursors.left.isDown = false : null);
             this.leftButton.on('pointerout', () => this.cursors ? this.cursors.left.isDown = false : null);
-    
+
             this.rightButton.on('pointerdown', () => this.cursors ? this.cursors.right.isDown = true : null);
             this.rightButton.on('pointerup', () => this.cursors ? this.cursors.right.isDown = false : null);
             this.rightButton.on('pointerout', () => this.cursors ? this.cursors.right.isDown = false : null);
-    
+
             this.upButton.on('pointerdown', () => this.cursors ? this.cursors.up.isDown = true : null);
             this.upButton.on('pointerup', () => this.cursors ? this.cursors.up.isDown = false : null);
             this.upButton.on('pointerout', () => this.cursors ? this.cursors.up.isDown = false : null);
-    
+
             this.downButton.on('pointerdown', () => this.cursors ? this.cursors.down.isDown = true : null);
             this.downButton.on('pointerup', () => this.cursors ? this.cursors.down.isDown = false : null);
             this.downButton.on('pointerout', () => this.cursors ? this.cursors.down.isDown = false : null);
@@ -245,7 +252,7 @@ export default class CityScene extends Phaser.Scene {
                 const otherPlayer = this.otherPlayers[playerId];
                 const isNear = otherPlayer.checkProximity(this.player);
                 if (isNear) this.nears.add(otherPlayer);
-                else        this.nears.delete(otherPlayer);
+                else this.nears.delete(otherPlayer);
             }
         }
 
@@ -270,7 +277,7 @@ export default class CityScene extends Phaser.Scene {
                 mask.invertAlpha = true;
                 this.overlay?.setMask(mask);
             }
-            this.#renderChatInput();
+            this.#showChatInput();
         } else {
             this.#hideChatInput();
         }
@@ -287,8 +294,8 @@ export default class CityScene extends Phaser.Scene {
             );
         }
     }
-    
-    #handleEnter (playerId: string) {
+
+    #handleEnter(playerId: string) {
         getPlayerData(playerId)
             .then((playerData) => {
                 this.addOtherPlayer({
@@ -322,13 +329,13 @@ export default class CityScene extends Phaser.Scene {
         });
     }
 
-    #handleTalk (playerId: string, message: string) {
+    #handleTalk(playerId: string, message: string) {
         if (this.otherPlayers[playerId]) {
             this.otherPlayers[playerId].showChatMessage(message);
         }
     }
 
-    #renderChatInput() {
+    #showChatInput() {
         if (this.chatInput?.visible) return;
         this.chatInput?.setVisible(true);
     }
@@ -370,7 +377,7 @@ export default class CityScene extends Phaser.Scene {
         const { x: baseX, y: baseY } = getPosition(15, 50);
         const size = 10;
         const margin = 10;
-        
+
         this.leftButton?.setPosition(baseX - size - margin, baseY);
         this.rightButton?.setPosition(baseX + size + margin, baseY);
         this.upButton?.setPosition(baseX, baseY - size - margin);

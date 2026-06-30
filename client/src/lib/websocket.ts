@@ -48,7 +48,7 @@ export default class WebSocketClient {
                     handleMove(payload.playerId, payload.x, payload.y, payload.animation, payload.timestamp);
                     break;
                 case WebSocketEvents.TALK:
-                    handleTalk(payload.playerId, payload.message);
+                    handleTalk(payload.from, payload.message);
                     break;
             }
         }

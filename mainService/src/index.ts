@@ -34,6 +34,17 @@ app.use(
     })
 );
 
+app.use(
+    "/world",
+    createProxyMiddleware({
+        target: `http://${process.env.PLAYER_SERVICE_REST_ADDR ?? "127.0.0.1:4001"}/world`,
+        changeOrigin: true,
+        on: {
+            proxyReq: fixRequestBody,
+        },
+    })
+);
+
 
 // Create and configure the WebSocket server
 const socket = new SocketServer(server, playerService);

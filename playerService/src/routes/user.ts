@@ -131,6 +131,43 @@ router.post("/", async (req, res) => {
 })
 
 
+// Create a new player for the authenticated user
+router.post("/player", fetchUser, async (req, res) => {
+    try {
+        if (!req.user || !req.user.id) {
+            res.status(401).send("Unauthorized");
+            return;
+        }
+
+        const user = await User.get(req.user.id);
+        if (!user) {
+            res.status(404).send("User not found");
+            return;
+        }
+
+        const { name, world_id, spritesheet, wealth, checkpoint } = req.body;
+        if (!name || !world_id || !spritesheet) {
+            res.status(400).send("Missing required fields");
+            return;
+        }
+
+        const newPlayer = await Player.create({
+            user_id: user.id,
+            world_id,
+            name,
+            spritesheet,
+            wealth,
+            checkpoint
+        });
+
+        res.status(201).json(newPlayer.exportData());
+    } catch (error) {
+        console.error(error);
+        res.status(500).send("Internal server error");
+    }
+})
+
+
 // User login
 router.post("/login", async (req, res) => {
     try {

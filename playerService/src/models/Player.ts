@@ -1,5 +1,5 @@
 import db, { Collections } from '../lib/db'
-import { getDoc, doc, addDoc, collection, getDocs, updateDoc } from 'firebase/firestore'
+import { getDoc, doc, addDoc, collection, getDocs, updateDoc, where, query } from 'firebase/firestore'
 import User from './User'
 import World from './World'
 
@@ -113,6 +113,26 @@ export default class Player {
 
         const playerData = { id: res.id, ...res.data() } as PlayerData
         return new Player(playerData)
+    }
+
+    static async getByUserId(user_id: string) {
+        const q = query(collection(db, Collections.PLAYERS), where("user_id", "==", user_id))
+        const res = await getDocs(q)
+        if (res.empty) return null
+
+        const playerData = { id: res.docs[0].id, ...res.docs[0].data() } as PlayerData
+        return new Player(playerData)
+    }
+
+    static async getByWorldId(world_id: string) {
+        const q = query(collection(db, Collections.PLAYERS), where("world_id", "==", world_id))
+        const res = await getDocs(q)
+        if (res.empty) return []
+
+        return res.docs.map(doc => {
+            const playerData = { id: doc.id, ...doc.data() } as PlayerData
+            return new Player(playerData)
+        })
     }
 
     static async update(id: string, playerData: Partial<Omit<PlayerData, "id">>) {

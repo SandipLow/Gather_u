@@ -4,6 +4,7 @@ dotenv.config();
 import cors from "cors";
 import express from "express";
 import userRouter from "./routes/user";
+import worldRouter from "./routes/world";
 import { createServer } from "http";
 import { startGrpcServer, stopGrpcServer } from "./lib/grpcServer";
 
@@ -17,6 +18,7 @@ app.use(express.json());
 
 app.get("/", (_req, res) => res.send("Hello World"));
 app.use("/user", userRouter);
+app.use("/world", worldRouter);
 
 // Start both servers
 startGrpcServer();

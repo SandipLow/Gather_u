@@ -1,3 +1,0 @@
-<h>
-    Home Page
-</h>

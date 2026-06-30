@@ -1,11 +1,12 @@
-import { sprites } from "./assets";
+import { animationFrames, sprites } from "./assets";
 
 export class Player extends Phaser.GameObjects.GameObject {
     private sprite: Phaser.Physics.Arcade.Sprite;
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
     public scene: Phaser.Scene;
     private playerData: PlayerData;
-    private position: { x: number, y: number } = { x: 0, y: 0 };
+    private direction: string = "down";
+    private position: { x: number, y: number };
     private animation: string | null = null;
     private animationPrefix: string;
     public lasttimestamp: number = 0;
@@ -18,9 +19,10 @@ export class Player extends Phaser.GameObjects.GameObject {
         this.playerData = playerData;
         this.animationPrefix = this.playerData.id + '-';
         this.cursors = cursors;
+        this.position = this.playerData.checkpoint;
 
         // Create a sprite for the player with the chosen texture
-        this.sprite = scene.physics.add.sprite(playerData.checkpoint.x, playerData.checkpoint.y, playerData.spritesheet);
+        this.sprite = scene.physics.add.sprite(playerData.checkpoint.x, playerData.checkpoint.y, playerData.spritesheet.split("_")[0]);
         this.sprite.body?.setSize(10, 16)
         this.sprite.body?.setOffset(3, 0)
 
@@ -33,13 +35,13 @@ export class Player extends Phaser.GameObjects.GameObject {
 
     // Dynamically create animations for the chosen sprite
     createAnimations() {
-        const selectedSpriteSheet = sprites[this.playerData.spritesheet];
+        const [ selectedSpriteSheet, variant ] = this.playerData.spritesheet.split("_");
 
         // Use player ID as a prefix for animation keys to avoid conflicts
-        for (const key in selectedSpriteSheet.animation_frames) {
+        for (const key in animationFrames[parseInt(variant ?? "0")]) {
             this.scene.anims.create({
                 key: this.animationPrefix + key,  // Add prefix to animation key
-                frames: this.scene.anims.generateFrameNumbers(this.playerData.spritesheet, selectedSpriteSheet.animation_frames[key]),
+                frames: this.scene.anims.generateFrameNumbers(selectedSpriteSheet, animationFrames[parseInt(variant ?? "0")][key]),
                 frameRate: 10,
                 repeat: -1
             });
@@ -55,25 +57,29 @@ export class Player extends Phaser.GameObjects.GameObject {
                 this.sprite.setVelocityX(-100);
                 this.sprite.anims.play(this.animationPrefix + 'walk-left', true);
                 this.animation = 'walk-left';
+                this.direction = 'left';
             }
             else if (this.cursors.right.isDown) {
                 this.sprite.setVelocityX(100);
                 this.sprite.anims.play(this.animationPrefix + 'walk-right', true);
                 this.animation = 'walk-right';
+                this.direction = 'right';
             }
             else if (this.cursors.up.isDown) {
                 this.sprite.setVelocityY(-100);
                 this.sprite.anims.play(this.animationPrefix + 'walk-up', true);
                 this.animation = 'walk-up';
+                this.direction = 'up';
             }
             else if (this.cursors.down.isDown) {
                 this.sprite.setVelocityY(100);
                 this.sprite.anims.play(this.animationPrefix + 'walk-down', true);
                 this.animation = 'walk-down';
+                this.direction = 'down';
             }
             else {
-                this.sprite.anims.stop();
-                this.animation = null;
+                this.sprite.anims.play(this.animationPrefix + 'idle-' + this.direction, true);
+                this.animation = 'idle-' + this.direction;
             }
         }
 
@@ -106,7 +112,7 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
     private sprite?: Phaser.Physics.Arcade.Sprite;
     public scene: Phaser.Scene;
     private playerData: PlayerData;
-    private position: { x: number, y: number } = { x: 0, y: 0 };
+    private position: { x: number, y: number };
     private animationPrefix: string;
     public lasttimestamp: number = 0;
 
@@ -119,6 +125,7 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
 
         // Store the player data
         this.playerData = playerData;
+        this.position = playerData.checkpoint;
 
         // Create a unique prefix for animations based on player ID
         this.animationPrefix = this.playerData.id + '-';
@@ -135,13 +142,13 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
 
     // Dynamically create animations for the chosen sprite
     createAnimations() {
-        const selectedSpriteSheet = sprites[this.playerData.spritesheet];
+        const [ selectedSpriteSheet, variant ] = this.playerData.spritesheet.split("_");
 
         // Use player ID as a prefix for animation keys to avoid conflicts
-        for (const key in selectedSpriteSheet.animation_frames) {
+        for (const key in animationFrames[parseInt(variant ?? "0")]) {
             this.scene.anims.create({
                 key: this.animationPrefix + key,  // Add prefix to animation key
-                frames: this.scene.anims.generateFrameNumbers(this.playerData.spritesheet, selectedSpriteSheet.animation_frames[key]),
+                frames: this.scene.anims.generateFrameNumbers(selectedSpriteSheet, animationFrames[parseInt(variant ?? "0")][key]),
                 frameRate: 10,
                 repeat: -1
             });
@@ -224,7 +231,7 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
         this.sprite = this.scene.physics.add.sprite(
             this.position.x,
             this.position.y,
-            this.playerData.spritesheet
+            this.playerData.spritesheet.split("_")[0]
         );
     }
 

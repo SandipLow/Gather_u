@@ -1,9 +1,7 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
     import Phaser from "phaser";
-    import MainMenuScene from "../scripts/MainMenuScene";
     import CityScene from "../scripts/CityScene";
-    import { authState } from "../lib/auth.svelte";
 
     let game: Phaser.Game;
     let fullScreenButton: HTMLButtonElement;
@@ -19,13 +17,6 @@
     };
 
     onMount(() => {
-        // check if the user is authenticated before initializing the game
-        if (!authState.isAuthenticated) {
-            window.location.replace("/auth");
-            return;
-        }
-
-
         // Define the Phaser game configuration
         const config: Phaser.Types.Core.GameConfig = {
             type: Phaser.AUTO,
@@ -36,7 +27,7 @@
             },
             pixelArt: true,
             roundPixels: false,
-            scene: [MainMenuScene, CityScene],
+            scene: [CityScene],
             scale: {
                 mode: Phaser.Scale.RESIZE
             },
@@ -49,6 +40,7 @@
         };
 
         game = new Phaser.Game(config);
+        game.scene.start("CityScene", history.state);
         fullScreenButton = document.getElementById("full-screen-btn") as HTMLButtonElement;
 
         // Add event listener for full screen button
@@ -77,10 +69,8 @@
 <!-- Style the game container if needed -->
 <style>
     .container {
-        width: 100vw;
+        width: 100%;
         height: 100vh;
-        overflow: hidden;
-        position: relative;
     }
     #game-container {
         width: 100%;

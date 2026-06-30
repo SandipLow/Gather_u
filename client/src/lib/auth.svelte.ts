@@ -1,4 +1,4 @@
-import { fetchUserData, getPlayerToken, login, register } from "./api";
+import { createPlayer, createWorld, fetchUserData, getPlayerToken, login, register } from "./api";
 
 class AuthState {
     #token = $state<string | null>(
@@ -76,6 +76,25 @@ class AuthState {
 
         const data = await getPlayerToken(playerId, this.#token);
         return data.playerToken;
+    }
+
+    async createPlayer(playerData: any) {
+        if (!this.#token) {
+            throw new Error('User not authenticated');
+        }
+
+        const data = await createPlayer(playerData, this.#token);
+        return data;
+    }
+
+
+    async createWorld(newWorldName: string) {
+        if (!this.#token) {
+            throw new Error('User not authenticated');
+        }
+
+        const data = await createWorld(newWorldName, this.#token);
+        return data;
     }
 
     logout() {
