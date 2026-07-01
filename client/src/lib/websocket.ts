@@ -1,12 +1,4 @@
-import { getPlayerToken } from "./api";
 import { authState } from "./auth.svelte";
-
-export const connectToWebSocket = () => {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3000';
-    const socket = new WebSocket(wsUrl);
-
-    return socket
-}
 
 enum WebSocketEvents {
     // A new player has entered the world

@@ -106,11 +106,11 @@ This project is currently in active development. Core systems being implemented 
 - ✅ Character sprite rendering
 - ✅ WebSocket connection handling
 - ✅ Player movement and physics
-- 🔄 User authentication
+- ✅ User authentication
 - 🔄 Scaling
-- ⏳ World persistence
-- ⏳ Combat system
-- ⏳ Inventory management
+- ✅ World persistence
+- 🔄 Map completion
+- ⏳ Voice and Video chat
 - ⏳ Chat system
 
 ## 🚦 Getting Started

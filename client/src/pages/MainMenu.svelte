@@ -23,7 +23,9 @@
 
     function enterWorld(player: any) {
         navigate("/game", {
-            state: player
+            state: {
+                playerData: player,
+            }
         });
     }
 

@@ -1,9 +1,8 @@
 import Phaser from 'phaser';
 import { OtherPlayer, Player } from './Player';
 import { sprites } from './assets';
-import WebSocketClient, { connectToWebSocket } from '../lib/websocket';
+import WebSocketClient from '../lib/websocket';
 import { getPlayerData } from '../lib/api';
-import { navigate } from 'svelte-routing';
 
 export default class CityScene extends Phaser.Scene {
     private player: Player | null = null;
@@ -20,10 +19,10 @@ export default class CityScene extends Phaser.Scene {
     private nears: Set<OtherPlayer> = new Set();
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
     private chatInput: Phaser.GameObjects.DOMElement | null = null;
-    private leftButton: Phaser.GameObjects.Text | null = null;
-    private rightButton: Phaser.GameObjects.Text | null = null;
-    private upButton: Phaser.GameObjects.Text | null = null;
-    private downButton: Phaser.GameObjects.Text | null = null;
+    private leftButton: Phaser.GameObjects.TileSprite | null = null;
+    private rightButton: Phaser.GameObjects.TileSprite | null = null;
+    private upButton: Phaser.GameObjects.TileSprite | null = null;
+    private downButton: Phaser.GameObjects.TileSprite | null = null;
 
     constructor() {
         super('CityScene');
@@ -42,11 +41,16 @@ export default class CityScene extends Phaser.Scene {
         for (const sprite in sprites) {
             this.load.spritesheet(sprite, sprites[sprite], { frameWidth: 16, frameHeight: 16 });
         }
+
+        // preload button UI
+        this.load.spritesheet('buttons_ui', 'assets/ui/Orange Button Icons.png', { frameWidth: 32, frameHeight: 32 });
     }
 
     create() {
+        this.textures.get("tiles").setFilter(Phaser.Textures.FilterMode.NEAREST);
+        
         // Load the tilemap
-        this.map = this.make.tilemap({ key: 'city_map', tileWidth: 16, tileHeight: 16 });
+        this.map = this.make.tilemap({ key: 'city_map' });
         const tileset = this.map.addTilesetImage('tileset', 'tiles');
 
         if (!tileset) {
@@ -57,7 +61,7 @@ export default class CityScene extends Phaser.Scene {
         const base_layer = this.map.createLayer('base_layer', tileset, 0, 0);
         const grass_flowers = this.map.createLayer('grass_flowers', tileset, 0, 0);
         const houses = this.map.createLayer('houses', tileset, 0, 0);
-        const trees = this.map.createLayer('trees', tileset, 0, 0);
+        const trees = this.map.createLayer('trees_poles', tileset, 0, 0);
 
         if (!base_layer || !grass_flowers || !houses || !trees) {
             console.error("Failed to create layer");
@@ -179,20 +183,11 @@ export default class CityScene extends Phaser.Scene {
         this.chatInput.setScrollFactor(0);
         this.chatInput.setVisible(false);
 
-        // Directional controls for mobile
-        const buttonStyle: Phaser.Types.GameObjects.Text.TextStyle = {
-            fontSize: '10px',
-            color: '#ffffff',
-            backgroundColor: 'rgba(51, 51, 51, 0.6)',
-            padding: { x: 6, y: 6 },
-            align: 'center'
-        };
-
-        // Create buttons
-        this.leftButton = this.add.text(0, 0, '◀', buttonStyle).setInteractive();
-        this.rightButton = this.add.text(0, 0, '▶', buttonStyle).setInteractive();
-        this.upButton = this.add.text(0, 0, '▲', buttonStyle).setInteractive();
-        this.downButton = this.add.text(0, 0, '▼', buttonStyle).setInteractive();
+        // Create Directional UI buttons
+        this.leftButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 105).setInteractive().setAlpha(0.6);
+        this.rightButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 90).setInteractive().setAlpha(0.6);
+        this.upButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 75).setInteractive().setAlpha(0.6);
+        this.downButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 60).setInteractive().setAlpha(0.6);
 
         [this.leftButton, this.rightButton, this.upButton, this.downButton].forEach(btn => {
             btn.setOrigin(0.5);
@@ -215,21 +210,57 @@ export default class CityScene extends Phaser.Scene {
             this.downButton.setVisible(true);
 
             // Touch/hold handling
-            this.leftButton.on('pointerdown', () => this.cursors ? this.cursors.left.isDown = true : null);
-            this.leftButton.on('pointerup', () => this.cursors ? this.cursors.left.isDown = false : null);
-            this.leftButton.on('pointerout', () => this.cursors ? this.cursors.left.isDown = false : null);
+            this.leftButton.on('pointerdown', () => {
+                this.cursors ? this.cursors.left.isDown = true : null
+                this.leftButton?.setTexture('buttons_ui', 107);
+            });
+            this.leftButton.on('pointerup', () => {
+                this.cursors ? this.cursors.left.isDown = false : null
+                this.leftButton?.setTexture('buttons_ui', 105);
+            });
+            this.leftButton.on('pointerout', () => {
+                this.cursors ? this.cursors.left.isDown = false : null
+                this.leftButton?.setTexture('buttons_ui', 105);
+            });
 
-            this.rightButton.on('pointerdown', () => this.cursors ? this.cursors.right.isDown = true : null);
-            this.rightButton.on('pointerup', () => this.cursors ? this.cursors.right.isDown = false : null);
-            this.rightButton.on('pointerout', () => this.cursors ? this.cursors.right.isDown = false : null);
+            this.rightButton.on('pointerdown', () => {
+                this.cursors ? this.cursors.right.isDown = true : null
+                this.rightButton?.setTexture('buttons_ui', 92);
+            });
+            this.rightButton.on('pointerup', () => {
+                this.cursors ? this.cursors.right.isDown = false : null
+                this.rightButton?.setTexture('buttons_ui', 90);
+            });
+            this.rightButton.on('pointerout', () => {
+                this.cursors ? this.cursors.right.isDown = false : null
+                this.rightButton?.setTexture('buttons_ui', 90);
+            });
 
-            this.upButton.on('pointerdown', () => this.cursors ? this.cursors.up.isDown = true : null);
-            this.upButton.on('pointerup', () => this.cursors ? this.cursors.up.isDown = false : null);
-            this.upButton.on('pointerout', () => this.cursors ? this.cursors.up.isDown = false : null);
+            this.upButton.on('pointerdown', () => {
+                this.cursors ? this.cursors.up.isDown = true : null
+                this.upButton?.setTexture('buttons_ui', 77);
+            });
+            this.upButton.on('pointerup', () => {
+                this.cursors ? this.cursors.up.isDown = false : null
+                this.upButton?.setTexture('buttons_ui', 75);
+            });
+            this.upButton.on('pointerout', () => {
+                this.cursors ? this.cursors.up.isDown = false : null
+                this.upButton?.setTexture('buttons_ui', 75);
+            });
 
-            this.downButton.on('pointerdown', () => this.cursors ? this.cursors.down.isDown = true : null);
-            this.downButton.on('pointerup', () => this.cursors ? this.cursors.down.isDown = false : null);
-            this.downButton.on('pointerout', () => this.cursors ? this.cursors.down.isDown = false : null);
+            this.downButton.on('pointerdown', () => {
+                this.cursors ? this.cursors.down.isDown = true : null
+                this.downButton?.setTexture('buttons_ui', 62);
+            });
+            this.downButton.on('pointerup', () => {
+                this.cursors ? this.cursors.down.isDown = false : null
+                this.downButton?.setTexture('buttons_ui', 60);
+            });
+            this.downButton.on('pointerout', () => {
+                this.cursors ? this.cursors.down.isDown = false : null
+                this.downButton?.setTexture('buttons_ui', 60);
+            });
         }
 
         this.#adjustUIElements();
@@ -376,7 +407,7 @@ export default class CityScene extends Phaser.Scene {
 
         const { x: baseX, y: baseY } = getPosition(15, 50);
         const size = 10;
-        const margin = 10;
+        const margin = 16;
 
         this.leftButton?.setPosition(baseX - size - margin, baseY);
         this.rightButton?.setPosition(baseX + size + margin, baseY);
