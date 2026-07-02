@@ -1,163 +1,156 @@
-import { animationFrames, sprites } from "./assets";
+import Phaser from 'phaser';
+import { animationFrames } from "./assets";
 
-export class Player extends Phaser.GameObjects.GameObject {
-    private sprite: Phaser.Physics.Arcade.Sprite;
-    private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
+abstract class BasePlayer extends Phaser.GameObjects.GameObject {
     public scene: Phaser.Scene;
-    private playerData: PlayerData;
-    private direction: string = "down";
-    private position: { x: number, y: number };
-    private animation: string | null = null;
-    private animationPrefix: string;
+    protected playerData: PlayerData;
+    protected position: { x: number; y: number };
+    protected animationPrefix: string;
+    protected chatBubble?: Phaser.GameObjects.Text;
     public lasttimestamp: number = 0;
 
-    constructor(scene: Phaser.Scene, playerData: PlayerData, cursors: Phaser.Types.Input.Keyboard.CursorKeys | null) {
+    constructor(scene: Phaser.Scene, playerData: PlayerData) {
         super(scene, 'Player');
-
-        // Store the scene and player data and initialize cursors
         this.scene = scene;
         this.playerData = playerData;
-        this.animationPrefix = this.playerData.id + '-';
-        this.cursors = cursors;
-        this.position = this.playerData.checkpoint;
+        this.position = playerData.checkpoint;
+        this.animationPrefix = playerData.id + '-';
 
-        // Create a sprite for the player with the chosen texture
-        this.sprite = scene.physics.add.sprite(playerData.checkpoint.x, playerData.checkpoint.y, playerData.spritesheet.split("_")[0]);
-        this.sprite.body?.setSize(10, 16)
-        this.sprite.body?.setOffset(3, 0)
-
-        // Define animations
         this.createAnimations();
-
-        // Add player sprite to the scene
-        scene.add.existing(this);
+        this.createChatBubble();
     }
 
-    // Dynamically create animations for the chosen sprite
-    createAnimations() {
-        const [ selectedSpriteSheet, variant ] = this.playerData.spritesheet.split("_");
+    private createAnimations() {
+        const [sheet, variant] = this.playerData.spritesheet.split('_');
+        const frames = animationFrames[parseInt(variant ?? '0')];
 
-        // Use player ID as a prefix for animation keys to avoid conflicts
-        for (const key in animationFrames[parseInt(variant ?? "0")]) {
+        for (const key in frames) {
+            if (this.scene.anims.exists(this.animationPrefix + key)) continue;
+
             this.scene.anims.create({
-                key: this.animationPrefix + key,  // Add prefix to animation key
-                frames: this.scene.anims.generateFrameNumbers(selectedSpriteSheet, animationFrames[parseInt(variant ?? "0")][key]),
+                key: this.animationPrefix + key,
+                frames: this.scene.anims.generateFrameNumbers(sheet, frames[key]),
                 frameRate: 10,
-                repeat: -1
+                repeat: -1,
             });
         }
     }
 
-    // Update method for movement and animations
+    private createChatBubble() {
+        this.chatBubble = this.scene.add.text(0, 0, '', {
+            fontSize: '12px',
+            color: '#fff',
+            backgroundColor: '#000',
+            padding: { x: 5, y: 2 },
+            align: 'center',
+        })
+
+        this.chatBubble.setOrigin(0.5);
+        this.chatBubble.setDepth(1000);
+        this.chatBubble.setVisible(false);
+    }
+
+    update(animation?: string | null, x?: number, y?: number, timestamp?: number) {
+        // allow subclasses to pass optional networked position/animation params
+        this.chatBubble?.setPosition(this.position.x, this.position.y - 20);
+    }
+
+    showChatMessage(message: string) {
+        this.chatBubble?.setText(message);
+        this.chatBubble?.setVisible(true);
+
+        this.scene.time.delayedCall(3000, () => this.chatBubble?.setVisible(false));
+    }
+
+    getPosition() { return this.position; }
+    getPlayerData() { return this.playerData; }
+
+    abstract getSprite(): Phaser.Physics.Arcade.Sprite | undefined;
+}
+
+
+export class Player extends BasePlayer {
+    private sprite: Phaser.Physics.Arcade.Sprite;
+    private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null;
+    private direction:string = 'down';
+    private animation: string | null = null;
+
+    constructor(
+        scene: Phaser.Scene,
+        playerData: PlayerData,
+        cursors: Phaser.Types.Input.Keyboard.CursorKeys | null,
+    ) {
+        super(scene, playerData);
+        this.cursors = cursors;
+
+        this.sprite = scene.physics.add.sprite(
+            playerData.checkpoint.x,
+            playerData.checkpoint.y,
+            playerData.spritesheet.split('_')[0],
+        );
+        this.sprite.body?.setSize(10, 16);
+        this.sprite.body?.setOffset(3, 0);
+
+        scene.add.existing(this);
+    }
+
     update() {
+        super.update();
         this.sprite.setVelocity(0);
 
         if (this.cursors) {
             if (this.cursors.left.isDown) {
                 this.sprite.setVelocityX(-100);
-                this.sprite.anims.play(this.animationPrefix + 'walk-left', true);
-                this.animation = 'walk-left';
+                this.#playAnim('walk-left');
                 this.direction = 'left';
-            }
-            else if (this.cursors.right.isDown) {
+            } else if (this.cursors.right.isDown) {
                 this.sprite.setVelocityX(100);
-                this.sprite.anims.play(this.animationPrefix + 'walk-right', true);
-                this.animation = 'walk-right';
+                this.#playAnim('walk-right');
                 this.direction = 'right';
-            }
-            else if (this.cursors.up.isDown) {
+            } else if (this.cursors.up.isDown) {
                 this.sprite.setVelocityY(-100);
-                this.sprite.anims.play(this.animationPrefix + 'walk-up', true);
-                this.animation = 'walk-up';
+                this.#playAnim('walk-up');
                 this.direction = 'up';
-            }
-            else if (this.cursors.down.isDown) {
+            } else if (this.cursors.down.isDown) {
                 this.sprite.setVelocityY(100);
-                this.sprite.anims.play(this.animationPrefix + 'walk-down', true);
-                this.animation = 'walk-down';
+                this.#playAnim('walk-down');
                 this.direction = 'down';
-            }
-            else {
-                this.sprite.anims.play(this.animationPrefix + 'idle-' + this.direction, true);
-                this.animation = 'idle-' + this.direction;
+            } else {
+                this.#playAnim('idle-' + this.direction);
             }
         }
 
-        this.position = {
-            x: this.sprite.x,
-            y: this.sprite.y
-        };
+        this.position = { x: this.sprite.x, y: this.sprite.y };
     }
 
-    getPosition() {
-        return this.position;
+    #playAnim(key: string) {
+        this.sprite.anims.play(this.animationPrefix + key, true);
+        this.animation = key;
     }
 
-    getAnimation() {
-        return this.animation;
-    }
-
-    getSprite() {
-        return this.sprite;
-    }
+    getSprite()     { return this.sprite; }
+    getAnimation()  { return this.animation; }
 
     destroy() {
         this.sprite.destroy();
         super.destroy();
     }
-
 }
 
-export class OtherPlayer extends Phaser.GameObjects.GameObject {
-    private sprite?: Phaser.Physics.Arcade.Sprite;
-    public scene: Phaser.Scene;
-    private playerData: PlayerData;
-    private position: { x: number, y: number };
-    private animationPrefix: string;
-    public lasttimestamp: number = 0;
 
+export class OtherPlayer extends BasePlayer {
+    private sprite?: Phaser.Physics.Arcade.Sprite;
 
     constructor(scene: Phaser.Scene, playerData: PlayerData) {
-        super(scene, 'Player');
-
-        // Store the scene
-        this.scene = scene;
-
-        // Store the player data
-        this.playerData = playerData;
-        this.position = playerData.checkpoint;
-
-        // Create a unique prefix for animations based on player ID
-        this.animationPrefix = this.playerData.id + '-';
-
-        // load the player sprite
+        super(scene, playerData);
         this.#load();
-
-        // Define animations
-        this.createAnimations();
-
-        // Add player sprite to the scene
         scene.add.existing(this);
     }
 
-    // Dynamically create animations for the chosen sprite
-    createAnimations() {
-        const [ selectedSpriteSheet, variant ] = this.playerData.spritesheet.split("_");
-
-        // Use player ID as a prefix for animation keys to avoid conflicts
-        for (const key in animationFrames[parseInt(variant ?? "0")]) {
-            this.scene.anims.create({
-                key: this.animationPrefix + key,  // Add prefix to animation key
-                frames: this.scene.anims.generateFrameNumbers(selectedSpriteSheet, animationFrames[parseInt(variant ?? "0")][key]),
-                frameRate: 10,
-                repeat: -1
-            });
-        }
-    }
-
     update(animation: string | null, x: number, y: number, timestamp: number) {
-        if (timestamp < this.lasttimestamp) return;
+        super.update();
 
+        if (timestamp < this.lasttimestamp) return;
         this.lasttimestamp = timestamp;
         this.position = { x, y };
 
@@ -168,57 +161,27 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
 
         if (animation) {
             this.sprite.anims.play(this.animationPrefix + animation, true);
-        }
-        else {
+        } else {
             this.sprite.anims.stop();
         }
     }
 
-    checkProximity(player: Player) {
+    checkProximity(player: Player): boolean {
         const distance = Phaser.Math.Distance.Between(
-            this.position.x,
-            this.position.y,
-            player.getSprite().x,
-            player.getSprite().y
+            this.position.x, this.position.y,
+            player.getSprite().x, player.getSprite().y,
         );
 
         if (distance < 240) {
-            // If within proximity, ensure the sprite is loaded
             this.#load();
-        }
-        else {
-            // If too far, unload the sprite
+        } else {
             this.#unload();
         }
 
         return distance < 40;
     }
 
-    getPlayerData() {
-        return this.playerData;
-    }
-
-    getPosition() {
-        return this.position;
-    }
-
-    showChatMessage(message: string) {
-        if (!this.sprite) return;
-
-        const chatBubble = this.scene.add.text(this.sprite.x, this.sprite.y - 20, message, {
-            fontSize: '12px',
-            color: '#fff',
-            backgroundColor: '#000',
-            padding: { x: 5, y: 2 },
-            align: 'center',
-        });
-
-        chatBubble.setOrigin(0.5);
-        chatBubble.setDepth(1000)
-        this.scene.time.delayedCall(3000, () => {
-            chatBubble.destroy();
-        });
-    }
+    getSprite() { return this.sprite; }
 
     destroy() {
         this.#unload();
@@ -227,17 +190,15 @@ export class OtherPlayer extends Phaser.GameObjects.GameObject {
 
     #load() {
         if (this.sprite) return;
-
         this.sprite = this.scene.physics.add.sprite(
             this.position.x,
             this.position.y,
-            this.playerData.spritesheet.split("_")[0]
+            this.playerData.spritesheet.split('_')[0],
         );
     }
 
     #unload() {
         if (!this.sprite) return;
-
         this.sprite.destroy();
         this.sprite = undefined;
     }

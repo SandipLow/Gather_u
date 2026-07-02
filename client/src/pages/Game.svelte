@@ -23,7 +23,7 @@
             pixelArt: true,
 
             width: window.innerWidth,
-            height: window.innerHeight - 70,
+            height: window.innerHeight - 40,
 
             render: {
                 antialias: false,
@@ -60,7 +60,7 @@
 
     function resizeGame() {
         setTimeout(() => {
-            game?.scale.setGameSize(window.innerWidth, window.innerHeight - 70);
+            game?.scale.setGameSize(window.innerWidth, window.innerHeight - 40);
         }, 200);
     }
 
@@ -93,10 +93,9 @@
             </div>
 
             <div>
-                <b
-                    >{playerData?.name || "Player"} in {playerData?.world
-                        ?.name || "Unknown World"}</b
-                >
+                <b>
+                    {playerData?.name || "Player"} in {playerData?.world?.name || "Unknown World"}
+                </b>
 
                 <small>
                     💰 {playerData?.wealth ?? 0}
@@ -125,7 +124,7 @@
     }
 
     header {
-        height: 70px;
+        height: 40px;
         flex-shrink: 0;
         display: flex;
         align-items: center;
