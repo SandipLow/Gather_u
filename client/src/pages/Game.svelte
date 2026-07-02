@@ -23,7 +23,7 @@
             pixelArt: true,
 
             width: window.innerWidth,
-            height: window.innerHeight-70,
+            height: window.innerHeight - 70,
 
             render: {
                 antialias: false,
@@ -33,6 +33,10 @@
             scale: {
                 mode: Phaser.Scale.FIT,
                 autoCenter: Phaser.Scale.CENTER_BOTH,
+            },
+
+            dom: {
+                createContainer: true,
             },
 
             scene: [CityScene],
@@ -55,12 +59,8 @@
     });
 
     function resizeGame() {
-
         setTimeout(() => {
-            game?.scale.setGameSize(
-                window.innerWidth,
-                window.innerHeight - 70
-            );
+            game?.scale.setGameSize(window.innerWidth, window.innerHeight - 70);
         }, 200);
     }
 
@@ -116,24 +116,24 @@
 
 <style>
     .page {
-        width:100%;
-        height:100vh;
-        display:flex;
-        flex-direction:column;
-        background:#020617;
-        overflow:hidden;
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #020617;
+        overflow: hidden;
     }
 
     header {
-        height:70px;
-        flex-shrink:0;
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        padding:0 25px;
-        background:rgba(15,23,42,.95);
-        border-bottom:1px solid rgba(0,255,255,.2);
-        z-index:10;
+        height: 70px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 25px;
+        background: rgba(15, 23, 42, 0.95);
+        border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+        z-index: 10;
     }
 
     .player {
@@ -170,16 +170,16 @@
     }
 
     #game-wrapper {
-        position:relative;
-        flex:1;
-        width:100%;
-        overflow:hidden;
+        position: relative;
+        flex: 1;
+        width: 100%;
+        overflow: hidden;
     }
 
     #game-container {
-        position:absolute;
-        inset:0;
-        width:100%;
-        height:100%;
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
     }
 </style>
