@@ -179,6 +179,10 @@ router.post("/player", fetchUser, async (req, res) => {
             return;
         }
 
+        cache.delete(`user:${user.id}`).catch(err => {
+            console.error("Failed to delete cache for user data [ user:" + user.id + " ]:", err)
+        });
+
         const newPlayer = await Player.create({
             user_id: user.id,
             world_id,
