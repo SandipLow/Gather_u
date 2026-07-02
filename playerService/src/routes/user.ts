@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import fetchUser from '../middlewares/fetchUser';
 import Player from '../models/Player';
+import { cache } from '../lib/cache';
 
 const router = Router();
 
@@ -17,6 +18,14 @@ router.get('/', fetchUser, async (req, res) => {
             return;
         }
 
+        const cacheKey = `user:${user_id}`;
+
+        const cached = await cache.get(cacheKey);
+        if (cached) {
+            res.json(cached);
+            return;
+        }
+
         const user = await User.get(user_id);
         if (!user) {
             res.status(404).json({ error: 'User not found' });
@@ -26,12 +35,18 @@ router.get('/', fetchUser, async (req, res) => {
         const players = await user.getPlayers();
         const playerData = await Promise.all(players);
 
-        res.json({
+        const payload = {
             id: user.id,
             name: user.name,
             email: user.email,
             players: playerData
+        };
+
+        cache.set(cacheKey, payload).catch(err => {
+            console.error("Failed to cache user data [ " + cacheKey + " -> " + JSON.stringify(payload) + " ]:", err)
         });
+        res.json(payload);
+
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -46,13 +61,13 @@ router.get("/:playerId", fetchUser, async (req, res) => {
             res.status(401).send("Unauthorized");
             return;
         }
-        
+
         const user = await User.get(req.user.id);
         if (!user) {
             res.status(404).send("User not found");
             return;
         }
-        
+
         const playerId = req.params.playerId;
         const players = await user.getPlayers();
 
@@ -75,6 +90,14 @@ router.get("/:playerId", fetchUser, async (req, res) => {
 // Get Public Player data
 router.get("/:playerId/public", async (req, res) => {
     try {
+        const cacheKey = `player:${req.params.playerId}:public`;
+
+        const cached = await cache.get(cacheKey);
+        if (cached) {
+            res.json(cached);
+            return;
+        }
+
         const playerId = req.params.playerId;
         const player = await Player.get(playerId);
 
@@ -83,7 +106,12 @@ router.get("/:playerId/public", async (req, res) => {
             return;
         }
 
-        res.json(player.getPublicData());
+        const payload = player.getPublicData();
+        await cache.set(cacheKey, payload).catch(err => {
+            console.error("Failed to cache player data [ " + cacheKey + " -> " + JSON.stringify(payload) + " ]:", err)
+        });
+
+        res.json(payload);
     } catch (error) {
         console.error(error);
         res.status(500).send("Internal server error");
@@ -94,7 +122,7 @@ router.get("/:playerId/public", async (req, res) => {
 // Create a new user
 router.post("/", async (req, res) => {
     try {
-        const {name, email, password} = req.body;
+        const { name, email, password } = req.body;
         if (!name || !email || !password) {
             res.status(400).send("Missing required fields");
             return;
@@ -174,7 +202,7 @@ router.post("/login", async (req, res) => {
         const { email, password } = req.body;
 
         const user = await User.getByEmail(email);
-        
+
         if (!user) {
             res.status(401).send("Invalid credentials");
             return;
@@ -203,6 +231,10 @@ router.post("/login", async (req, res) => {
 router.put("/", fetchUser, async (req, res) => {
     try {
         await User.update(req.user!.id, req.body);
+        const cacheKey = `user:${req.user!.id}`;
+        cache.delete(cacheKey).catch(err => {
+            console.error("Failed to delete cache for user data [ " + cacheKey + " ]:", err)
+        });
         res.send("User updated successfully");
 
     } catch (error) {

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import World from "../models/World";
 import fetchUser from "../middlewares/fetchUser";
+import { cache } from "../lib/cache";
 
 const worldRouter = Router();
 
@@ -14,7 +15,20 @@ worldRouter.get("/search", async (req, res) => {
     }
 
     try {
+        const cacheKey = `world:search:${search.toLowerCase().trim()}`;
+
+        const cached = await cache.get(cacheKey);
+        if (cached) {
+            res.json(cached);
+            return;
+        }
+
         const worlds = await World.searchByName(search);
+
+        cache.set(cacheKey, worlds, 300).catch(err =>
+            console.error(`Cache set failed for ${cacheKey}:`, err)
+        );
+
         res.json(worlds);
     } catch (error) {
         res.status(500).json({ error: "Failed to search worlds" });
