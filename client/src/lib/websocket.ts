@@ -8,42 +8,86 @@ enum WebSocketEvents {
     // A player has moved to a new position
     MOVE = "move",
     // A player has sent a chat message
-    TALK = "talk"
+    TALK = "talk",
+    // A ping message to check if the connection is alive
+    PING = "ping",
+    // A pong message in response to a ping
+    PONG = "pong"
 }
+
+// Interval to send ping messages in milliseconds
+const LATENCY_CHECK_INTERVAL = 5000;
 
 /**
  * A WebSocket client that connects to a server and handles incoming messages for player events.
  * It provides methods to send messages to the server for player events such as entering, leaving, moving, and talking.
  */
 export default class WebSocketClient {
-    socket: WebSocket
+    private socket: WebSocket;
+    private token: string;
 
-    private constructor(
-        socket: WebSocket,
-        handleEnter: (playerId: string) => void,
-        handleLeave: (playerId: string) => void,
-        handleMove: (playerId: string, x: number, y: number, animation: string, timestamp: number) => void,
-        handleTalk: (playerId: string, message: string) => void
-    ) {
+    onEnter: (playerId: string) => void = () => {};
+    onLeave: (playerId: string) => void = () => {};
+    onMove: (playerId: string, x: number, y: number, animation: string, timestamp: number) => void = () => {};
+    onTalk: (playerId: string, message: string) => void = () => {};
+    
+    onOpen: () => void = () => {};
+    onReconnect: () => void = () => {};
+    onPong: (latency: number) => void = () => {};
+    onError: (error: Event) => void = () => {};
+    onClose: () => void = () => {};
+
+    private constructor(socket: WebSocket, token: string) {
         this.socket = socket;
+        this.token = token;
+
+        this.#setupEventHandlers();
+        
+        setInterval(() => {
+            this.sendData(WebSocketEvents.PING, { timestamp: Date.now() });
+        }, LATENCY_CHECK_INTERVAL);
+    }
+
+    #setupEventHandlers() {
+        this.socket.onopen = () => {
+            this.onOpen();
+        };
 
         this.socket.onmessage = (e) => {
             const { type, payload } = JSON.parse(e.data);
             switch (type) {
                 case WebSocketEvents.ENTER:
-                    handleEnter(payload.playerId);
+                    this.onEnter(payload.playerId);
                     break;
                 case WebSocketEvents.LEAVE:
-                    handleLeave(payload.playerId);
+                    this.onLeave(payload.playerId);
                     break;
                 case WebSocketEvents.MOVE:
-                    handleMove(payload.playerId, payload.x, payload.y, payload.animation, payload.timestamp);
+                    this.onMove(payload.playerId, payload.x, payload.y, payload.animation, payload.timestamp);
                     break;
                 case WebSocketEvents.TALK:
-                    handleTalk(payload.from, payload.message);
+                    this.onTalk(payload.from, payload.message);
+                    break;
+                case WebSocketEvents.PONG:
+                    this.onPong(Date.now() - payload.timestamp);
                     break;
             }
         }
+
+        this.socket.onclose = () => {
+            console.warn("WebSocket connection closed. Attempting to reconnect...");
+            this.onClose();
+            
+            setTimeout(() => {
+                this.reConnect();
+            }, 2000);
+        };
+
+
+        this.socket.onerror = (error) => {
+            console.error("WebSocket error:", error);
+            this.onError(error);
+        };
     }
 
     /**
@@ -53,24 +97,19 @@ export default class WebSocketClient {
      * @param `handleMove` handler for when a player moves to a new position
      * @param `handleTalk` handler for when a player sends a chat message
      */
-    static async create(
-        playerId: string,
-        handleEnter: (playerId: string) => void,
-        handleLeave: (playerId: string) => void,
-        handleMove: (playerId: string, x: number, y: number, animation: string, timestamp: number) => void,
-        handleTalk: (playerId: string, message: string) => void
-    ) {
+    static async create(playerId: string) {
         const token = await authState.getPlayerToken(playerId);
         const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3000';
         const socket = new WebSocket(`${wsUrl}?token=${token}`);
-        return new WebSocketClient(socket, handleEnter, handleLeave, handleMove, handleTalk);
+        return new WebSocketClient(socket, token);
     }
 
     private sendData(type: WebSocketEvents, payload: any) {
         if (this.socket.readyState !== WebSocket.OPEN) {
-            console.error("WebSocket is not open. Ready state:", this.socket.readyState);
+            console.error(`Failed to send message ${type}. WebSocket is not open. Ready state:`, this.socket.readyState);
             return;
         }
+
         this.socket.send(JSON.stringify({ type, payload }));
     }
 
@@ -82,7 +121,20 @@ export default class WebSocketClient {
         this.sendData(WebSocketEvents.TALK, { players, message });
     }
 
-    onClose() {
+    reConnect() {
+        if (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING) {
+            console.warn("WebSocket is already open or connecting. No need to reconnect.");
+            return;
+        }
+
+        const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3000';
+        this.socket = new WebSocket(`${wsUrl}?token=${this.token}`);
+
+        this.#setupEventHandlers();
+        this.onReconnect();
+    }
+
+    close() {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
             this.socket.close();
         }

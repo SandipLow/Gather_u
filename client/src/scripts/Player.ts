@@ -160,9 +160,9 @@ export class OtherPlayer extends BasePlayer {
         this.sprite.y = y;
 
         if (animation) {
-            this.sprite.anims.play(this.animationPrefix + animation, true);
+            this.sprite.anims?.play(this.animationPrefix + animation, true);
         } else {
-            this.sprite.anims.stop();
+            this.sprite.anims?.stop();
         }
     }
 

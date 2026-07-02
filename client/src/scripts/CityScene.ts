@@ -10,7 +10,7 @@ export default class CityScene extends Phaser.Scene {
         prev: { x: number; y: number; animation: string; timestamp: number };
         next: { x: number; y: number; animation: string; timestamp: number };
     }>();
-    private otherPlayers: { [key: string]: OtherPlayer } = {};
+    private otherPlayers = new Map<string, OtherPlayer>();
     private map: Phaser.Tilemaps.Tilemap | null = null;
     private socket: WebSocketClient | null = null;
     private playerData!: PlayerData;
@@ -23,13 +23,15 @@ export default class CityScene extends Phaser.Scene {
     private rightButton: Phaser.GameObjects.TileSprite | null = null;
     private upButton: Phaser.GameObjects.TileSprite | null = null;
     private downButton: Phaser.GameObjects.TileSprite | null = null;
+    private isSceneAlive = true;
 
     constructor() {
         super('CityScene');
     }
 
-    init(playerData: PlayerData) {
+    init({playerData, socket}: { playerData: PlayerData; socket: WebSocketClient }) {
         this.playerData = playerData;
+        this.socket = socket;
     }
 
     preload() {
@@ -47,6 +49,8 @@ export default class CityScene extends Phaser.Scene {
     }
 
     create() {
+        this.isSceneAlive = true;
+
         this.textures.get("tiles").setFilter(Phaser.Textures.FilterMode.NEAREST);
         
         // Load the tilemap
@@ -72,35 +76,17 @@ export default class CityScene extends Phaser.Scene {
         trees.setCollisionByProperty({ collides: true });
 
 
-        // Connect to WebSocket server
-        WebSocketClient.create(
-            this.playerData.id,
-            this.#handleEnter.bind(this),
-            this.#handleLeave.bind(this),
-            this.#handleMove.bind(this),
-            this.#handleTalk.bind(this)
-        ).then(socket => {
-            this.socket = socket;
+        // Bind the WebSocket events to the scene's methods
+        if (this.socket) {
+            this.socket.onEnter = this.#handleEnter.bind(this);
+            this.socket.onLeave = this.#handleLeave.bind(this);
+            this.socket.onMove = this.#handleMove.bind(this);
+            this.socket.onTalk = this.#handleTalk.bind(this);
+        }
 
-            // reconnect on close
-            socket.socket.onclose = () => {
-                this.scene.restart(this.playerData);
-                console.log('Disconnected from server, attempting to reconnect...');;
-            }
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.#handleShutdown, this);
+        this.events.once(Phaser.Scenes.Events.DESTROY, this.#handleShutdown, this);
 
-            this.events.on('shutdown', () => {
-                socket.onClose();
-            });
-
-            this.events.on('destroy', () => {
-                socket.onClose();
-            });
-        }).catch(err => {
-            console.error("Failed to connect to WebSocket server:", err);
-            setTimeout(() => {
-                this.scene.restart(this.playerData);
-            }, 2000);
-        });
 
         // Create player
         this.cursors = this.input.keyboard ? this.input.keyboard.createCursorKeys() : null;
@@ -272,6 +258,8 @@ export default class CityScene extends Phaser.Scene {
     }
 
     update() {
+        if (!this.isSceneAlive) return;
+
         this.overlay?.clear();
         this.overlay?.clearMask();
         this.overlayMask?.clear();
@@ -279,8 +267,7 @@ export default class CityScene extends Phaser.Scene {
         if (this.player) {
             this.player.update();
 
-            for (const playerId in this.otherPlayers) {
-                const otherPlayer = this.otherPlayers[playerId];
+            for (const [playerId, otherPlayer] of this.otherPlayers) {
                 const isNear = otherPlayer.checkProximity(this.player);
                 if (isNear) this.nears.add(otherPlayer);
                 else this.nears.delete(otherPlayer);
@@ -325,31 +312,52 @@ export default class CityScene extends Phaser.Scene {
             );
         }
     }
+    
 
-    #handleEnter(playerId: string) {
+    __handlingEnter = new Set<string>()
+
+    #handleEnter(playerId: string, position?: { x: number, y: number }) {
+        if (!this.isSceneAlive) return;
+
+        if (this.__handlingEnter.has(playerId)) return;
+        this.__handlingEnter.add(playerId);
+
         getPlayerData(playerId)
             .then((playerData) => {
+                if (!this.isSceneAlive) return;
+
                 this.addOtherPlayer({
                     ...playerData,
-                    position: playerData.position || playerData.checkpoint
+                    position: position || playerData.checkpoint
                 });
             })
             .catch((error) => {
                 console.error(`Failed to fetch player data for ${playerId}:`, error);
+            })
+            .finally(() => {
+                this.__handlingEnter.delete(playerId);
             });
     }
 
     #handleLeave(playerId: string) {
-        if (this.otherPlayers[playerId]) {
-            this.otherPlayers[playerId].destroy();
-            this.nears.delete(this.otherPlayers[playerId]);
-            delete this.otherPlayers[playerId];
+        if (!this.isSceneAlive) return;
+
+        if (this.otherPlayers.has(playerId)) {
+            this.otherPlayers.get(playerId)!.destroy();
+            this.nears.delete(this.otherPlayers.get(playerId)!);
+            this.otherPlayers.delete(playerId);
             this.moveBuffer.delete(playerId); // ← clean up buffer
         }
     }
 
     #handleMove(playerId: string, x: number, y: number, animation: string, timestamp: number) {
-        if (!this.otherPlayers[playerId]) return;
+        if (!this.isSceneAlive) return;
+
+        if (!this.otherPlayers.has(playerId)) {
+            console.warn(`Received move for unknown player ${playerId}`);
+            this.#handleEnter(playerId, { x, y }); // ← try to fetch and add them
+            return;
+        }
 
         const receivedAt = Date.now(); // ← when WE received it, not when they sent it
         const existing = this.moveBuffer.get(playerId);
@@ -361,8 +369,10 @@ export default class CityScene extends Phaser.Scene {
     }
 
     #handleTalk(playerId: string, message: string) {
-        if (this.otherPlayers[playerId]) {
-            this.otherPlayers[playerId].showChatMessage(message);
+        if (!this.isSceneAlive) return;
+
+        if (this.otherPlayers.has(playerId)) {
+            this.otherPlayers.get(playerId)!.showChatMessage(message);
         }
     }
 
@@ -377,11 +387,19 @@ export default class CityScene extends Phaser.Scene {
     }
 
     addOtherPlayer(playerData: any) {
-        this.otherPlayers[playerData.id] = new OtherPlayer(this, playerData);
+        if (!this.isSceneAlive) return;
+
+        if (this.otherPlayers.has(playerData.id)) {
+            console.warn(`Player ${playerData.id} already exists. Updating data.`);
+            this.otherPlayers.get(playerData.id)?.destroy();
+            this.otherPlayers.delete(playerData.id);
+        }
+        this.otherPlayers.set(playerData.id, new OtherPlayer(this, playerData));
     }
 
     #handleMessage(msg: string) {
         this.socket?.sendTalk(Array.from(this.nears).map(plr => plr.getPlayerData().id), msg);
+        this.player?.showChatMessage(msg);
     }
 
     #adjustUIElements() {
@@ -424,9 +442,11 @@ export default class CityScene extends Phaser.Scene {
     private INTERP_DURATION = 120; // ms
 
     #tickInterpolation() {
+        if (!this.isSceneAlive) return;
+
         const now = Date.now();
         for (const [playerId, { prev, next }] of this.moveBuffer) {
-            const player = this.otherPlayers[playerId];
+            const player = this.otherPlayers.get(playerId);
             if (!player) continue;
 
             // Interpolate over a fixed window from when next arrived
@@ -437,6 +457,27 @@ export default class CityScene extends Phaser.Scene {
 
             player.update(next.animation, x, y, now);
         }
+    }
+
+    #handleShutdown() {
+        this.isSceneAlive = false;
+
+        if (this.socket) {
+            this.socket.onEnter = () => {};
+            this.socket.onLeave = () => {};
+            this.socket.onMove = () => {};
+            this.socket.onTalk = () => {};
+        }
+
+        for (const otherPlayer of this.otherPlayers.values()) {
+            otherPlayer.destroy();
+        }
+
+        this.otherPlayers.clear();
+        this.moveBuffer.clear();
+        this.nears.clear();
+        this.player?.destroy();
+        this.player = null;
     }
 }
 

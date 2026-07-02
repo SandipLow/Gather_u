@@ -29,22 +29,20 @@ const grpcPlayerService: grpc.UntypedServiceImplementation = {
         try {
             const { playerId } = request;
 
-            // Guard: already online
-            if (players.has(playerId)) {
-                cb({ code: grpc.status.ALREADY_EXISTS, message: `Player ${playerId} is already in the world.` });
-                return;
+            // Load player from DB if not already cached
+            if (!players.has(playerId)) {
+                const player = await Player.get(playerId);
+                if (!player) {
+                    cb({ code: grpc.status.NOT_FOUND, message: `Player ${playerId} not found.` });
+                    return;
+                }
+                players.set(playerId, player);
             }
-
-            // Load player from DB (only on first enter)
-            const player = await Player.get(playerId);
-            if (!player) {
-                cb({ code: grpc.status.NOT_FOUND, message: `Player ${playerId} not found.` });
-                return;
-            }
-            players.set(playerId, player);
+            
+            const player = players.get(playerId)!;
+            const { world_id: worldId } = player;
 
             // Load world into memory if not already cached
-            const { world_id: worldId } = player;
             if (!worlds.has(worldId)) {
                 const world = await World.get(worldId);
                 if (!world) {

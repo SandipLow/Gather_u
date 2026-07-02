@@ -16,11 +16,13 @@ declare module "ws" {
 enum WebSocketEvents {
     ENTER = "enter",
     LEAVE = "leave",
-    MOVE  = "move",
-    TALK  = "talk",
+    MOVE = "move",
+    TALK = "talk",
+    PING = "ping",
+    PONG = "pong"
 }
 
-const MAX_TALK_TARGETS   = 50;
+const MAX_TALK_TARGETS = 50;
 const HEARTBEAT_INTERVAL = 30_000;
 
 export default class SocketServer {
@@ -33,9 +35,9 @@ export default class SocketServer {
     private heartbeatTimer: NodeJS.Timeout;
 
     constructor(server: any, playerService: PlayerService) {
-        this.serverid      = uuidv4();
+        this.serverid = uuidv4();
         this.playerService = playerService;
-        this.players       = new Map();
+        this.players = new Map();
 
         this.redisPubSub = new RedisPubSub(
             this.serverid,
@@ -80,7 +82,7 @@ export default class SocketServer {
             return;
         }
 
-        const url   = new URL(req.url!, `http://${req.headers.host}`);
+        const url = new URL(req.url!, `http://${req.headers.host}`);
         const token = url.searchParams.get("token");
         let playerId: string;
 
@@ -95,14 +97,14 @@ export default class SocketServer {
 
         this.players.get(playerId)?.close();
 
-        ws.isAlive  = true;
+        ws.isAlive = true;
         ws.playerId = playerId;
         this.players.set(playerId, ws);
 
-        ws.on("pong",    () => { ws.isAlive = true; });
-        ws.on("error",   console.error);
+        ws.on("pong", () => { ws.isAlive = true; });
+        ws.on("error", console.error);
         ws.on("message", this.onMessage.bind(this, ws));
-        ws.on("close",   this.onClose.bind(this, ws));
+        ws.on("close", this.onClose.bind(this, ws));
 
         this.playerService.enterPlayerWorld(playerId)
             .then((otherPlayers) => {
@@ -126,6 +128,12 @@ export default class SocketServer {
             switch (type) {
                 case WebSocketEvents.MOVE: this.handleMove(payload, ws); break;
                 case WebSocketEvents.TALK: this.handleTalk(payload, ws); break;
+                case WebSocketEvents.PING: {
+                    if (ws.playerId) {
+                        this.sendMessage(ws.playerId, WebSocketEvents.PONG, payload); 
+                    }
+                    break;
+                }
                 default: console.warn("Unknown message type:", type, data.toString());
             }
         } catch (error) {
@@ -161,7 +169,12 @@ export default class SocketServer {
     sendMessage(playerId: string, type: string, payload: any) {
         const ws = this.players.get(playerId);
         if (ws) {
-            ws.send(JSON.stringify({ type, payload }));
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type, payload }));
+            }
+            else {
+                setTimeout(() => this.sendMessage(playerId, type, payload), 2000);
+            }
         } else {
             this.redisPubSub.sendMessage({ playerId, type, payload, serverid: this.serverid });
         }

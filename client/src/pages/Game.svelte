@@ -3,60 +3,15 @@
     import Phaser from "phaser";
     import CityScene from "../scripts/CityScene";
     import { navigate } from "svelte-routing";
+    import WebSocketClient from "../lib/websocket";
 
     let game: Phaser.Game | null = null;
     let fullscreen = false;
     let playerData: any = null;
-
-    onMount(async () => {
-        if (!history.state?.playerData) {
-            window.location.href = "/";
-            return;
-        }
-
-        playerData = history.state.playerData;
-
-        game = new Phaser.Game({
-            type: Phaser.AUTO,
-            parent: "game-container",
-
-            pixelArt: true,
-
-            width: window.innerWidth,
-            height: window.innerHeight - 40,
-
-            render: {
-                antialias: false,
-                roundPixels: true,
-            },
-
-            scale: {
-                mode: Phaser.Scale.FIT,
-                autoCenter: Phaser.Scale.CENTER_BOTH,
-            },
-
-            dom: {
-                createContainer: true,
-            },
-
-            scene: [CityScene],
-
-            physics: {
-                default: "arcade",
-                arcade: {
-                    gravity: {
-                        x: 0,
-                        y: 0,
-                    },
-                },
-            },
-        });
-
-        game.scene.start("CityScene", playerData);
-
-        window.addEventListener("resize", resizeGame);
-        document.addEventListener("fullscreenchange", resizeGame);
-    });
+    let socket: WebSocketClient | null = null;
+    let connectionStatus = "Connecting...";
+    let connectionColor = "#facc15";
+    let latency = "--";
 
     function resizeGame() {
         setTimeout(() => {
@@ -69,13 +24,117 @@
 
         if (!document.fullscreenElement) {
             await container?.requestFullscreen();
+            fullscreen = true;
         } else {
             await document.exitFullscreen();
+            fullscreen = false;
         }
+
+        resizeGame();
     }
 
+    onMount(async () => {
+        try {
+            if (!history.state?.playerData) {
+                window.location.href = "/";
+                return;
+            }
+
+            playerData = history.state.playerData;
+            socket = await WebSocketClient.create(playerData.id);
+
+            if (!socket) {
+                console.error("WebSocket connection failed");
+                setTimeout(() => {
+                    window.location.href = "/";
+                }, 2000);
+                return;
+            }
+
+            socket.onOpen = () => {
+                connectionStatus = "Connected";
+                connectionColor = "#22c55e";
+            };
+
+            socket.onPong = (ping: number) => {
+                latency = `${ping} ms`;
+            };
+
+            socket.onReconnect = () => {
+                connectionStatus = "Reconnecting...";
+                connectionColor = "#f59e0b";
+
+                game?.scene.start("CityScene", { playerData, socket });
+            };
+
+            socket.onClose = () => {
+                connectionStatus = "Disconnected";
+                connectionColor = "#ef4444";
+            };
+
+            socket.onError = () => {
+                connectionStatus = "Connection Error";
+                connectionColor = "#ef4444";
+            };
+
+            game = new Phaser.Game({
+                type: Phaser.AUTO,
+                parent: "game-container",
+
+                pixelArt: true,
+
+                width: window.innerWidth,
+                height: window.innerHeight - 40,
+
+                render: {
+                    antialias: false,
+                    roundPixels: true,
+                },
+
+                scale: {
+                    mode: Phaser.Scale.FIT,
+                    autoCenter: Phaser.Scale.CENTER_BOTH,
+                },
+
+                dom: {
+                    createContainer: true,
+                },
+
+                scene: [],
+
+                physics: {
+                    default: "arcade",
+                    arcade: {
+                        gravity: {
+                            x: 0,
+                            y: 0,
+                        },
+                    },
+                },
+            });
+
+            game.events.on("ready", () => {
+                game?.scene.add("CityScene", CityScene, true, {
+                    playerData,
+                    socket,
+                });
+            });
+
+            window.addEventListener("resize", resizeGame);
+            document.addEventListener("fullscreenchange", resizeGame);
+        } catch (error) {
+            console.error("Error In Game Initialization", error);
+            setTimeout(() => {
+                window.location.href = "/";
+            }, 2000);
+        }
+    });
+    
+
     onDestroy(() => {
+        socket?.close();
         game?.destroy(true);
+
         game = null;
 
         window.removeEventListener("resize", resizeGame);
@@ -87,19 +146,31 @@
     <header>
         <button on:click={() => navigate("/")}> ← Menu </button>
 
-        <div class="player">
-            <div class="avatar">
-                {playerData?.name?.charAt(0).toUpperCase()}
+        <div class="info">
+            <div class="player">
+                <div class="avatar">
+                    {playerData?.name?.charAt(0).toUpperCase()}
+                </div>
+
+                <div>
+                    <b>
+                        {playerData?.name} · {playerData?.world?.name}
+                    </b>
+
+                    <small>
+                        💰 {playerData?.wealth ?? 0}
+                    </small>
+                </div>
             </div>
 
-            <div>
-                <b>
-                    {playerData?.name || "Player"} in {playerData?.world?.name || "Unknown World"}
-                </b>
+            <div class="network">
+                <span class="status" style="--status:{connectionColor}">
+                    ● {connectionStatus}
+                </span>
 
-                <small>
-                    💰 {playerData?.wealth ?? 0}
-                </small>
+                <span>
+                    📶 {latency}
+                </span>
             </div>
         </div>
 
@@ -121,6 +192,8 @@
         flex-direction: column;
         background: #020617;
         overflow: hidden;
+        font-family: "Arial", sans-serif;
+        font-size: 14px;
     }
 
     header {
@@ -133,6 +206,25 @@
         background: rgba(15, 23, 42, 0.95);
         border-bottom: 1px solid rgba(0, 255, 255, 0.2);
         z-index: 10;
+    }
+
+    .info {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+
+    .network {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        color: #d1d5db;
+        font-size: 13px;
+    }
+
+    .status {
+        color: var(--status);
+        font-weight: bold;
     }
 
     .player {
@@ -148,8 +240,8 @@
     }
 
     .avatar {
-        width: 40px;
-        height: 40px;
+        width: 30px;
+        height: 30px;
         border-radius: 50%;
         display: flex;
         justify-content: center;
@@ -159,7 +251,7 @@
     }
 
     button {
-        padding: 10px 20px;
+        padding: 8px 12px;
         border: 0;
         border-radius: 10px;
         background: linear-gradient(90deg, #06b6d4, #8b5cf6);
