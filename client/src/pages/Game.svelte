@@ -13,6 +13,15 @@
     let connectionColor = "#facc15";
     let latency = "--";
 
+    $: pingColor =
+        latency === "--"
+            ? "#9ca3af"
+            : parseInt(latency) < 80
+            ? "#22c55e"
+            : parseInt(latency) < 150
+            ? "#f59e0b"
+            : "#ef4444";
+
     function resizeGame() {
         setTimeout(() => {
             game?.scale.setGameSize(window.innerWidth, window.innerHeight - 40);
@@ -63,6 +72,7 @@
             socket.onReconnect = () => {
                 connectionStatus = "Reconnecting...";
                 connectionColor = "#f59e0b";
+                latency = "--";
 
                 game?.scene.start("CityScene", { playerData, socket });
             };
@@ -70,11 +80,13 @@
             socket.onClose = () => {
                 connectionStatus = "Disconnected";
                 connectionColor = "#ef4444";
+                latency = "--";
             };
 
             socket.onError = () => {
                 connectionStatus = "Connection Error";
                 connectionColor = "#ef4444";
+                latency = "--";
             };
 
             game = new Phaser.Game({
@@ -168,7 +180,7 @@
                     ● {connectionStatus}
                 </span>
 
-                <span>
+                <span style="color: {pingColor}">
                     📶 {latency}
                 </span>
             </div>
