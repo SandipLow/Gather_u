@@ -1,6 +1,7 @@
 const WORLDEVENT_CHANNEL = "world_event_channel";
 
 import Redis from "ioredis";
+import config from "./config";
 
 
 export default class RedisPubSub {
@@ -15,9 +16,9 @@ export default class RedisPubSub {
         handleError: (err: Error)=>void, 
         handleMessage: (channel: string, message: string)=>void
     ) {
-        const redisUrl = process.env.REDIS_URI;
-        const redisUsername = process.env.REDIS_USERNAME;
-        const redisPassword = process.env.REDIS_PASSWORD;
+        const redisUrl = config.redis.uri;
+        const redisUsername = config.redis.username;
+        const redisPassword = config.redis.password;
 
         if (!redisUrl) {
             console.error('Redis URI not provided');

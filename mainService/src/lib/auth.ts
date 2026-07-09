@@ -1,9 +1,10 @@
 import { sign, verify } from "jsonwebtoken";
+import config from "./config";
 
 export const verifyJWT = (token: string) => {
-    return verify(token, process.env.JWT_SECRET!);
+    return verify(token, config.jwt.secretKey);
 };
 
 export const generateJWT = (payload: object) => {
-    return sign(payload, process.env.JWT_SECRET!, { expiresIn: "12h" });
+    return sign(payload, config.jwt.secretKey, { expiresIn: "12h" });
 };

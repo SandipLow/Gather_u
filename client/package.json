@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@types/ws": "^8.5.12",
+    "mediasoup-client": "^3.21.0",
     "phaser": "^3.86.0",
     "ws": "^8.18.0"
   }
