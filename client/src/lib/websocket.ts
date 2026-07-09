@@ -25,6 +25,8 @@ const LATENCY_CHECK_INTERVAL = 5000;
 export default class WebSocketClient {
     private socket: WebSocket;
     private token: string;
+    private isClosedManually: boolean = false;
+    private pingInterval: ReturnType<typeof setInterval> | null = null;
 
     onEnter: (playerId: string) => void = () => {};
     onLeave: (playerId: string) => void = () => {};
@@ -43,7 +45,7 @@ export default class WebSocketClient {
 
         this.#setupEventHandlers();
         
-        setInterval(() => {
+        this.pingInterval = setInterval(() => {
             this.sendData(WebSocketEvents.PING, { timestamp: Date.now() });
         }, LATENCY_CHECK_INTERVAL);
     }
@@ -75,6 +77,11 @@ export default class WebSocketClient {
         }
 
         this.socket.onclose = () => {
+            if (this.isClosedManually) {
+                this.onClose();
+                return;
+            }
+
             console.warn("WebSocket connection closed. Attempting to reconnect...");
             this.onClose();
             
@@ -122,7 +129,7 @@ export default class WebSocketClient {
     }
 
     reConnect() {
-        if (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING) {
+        if ((this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING) && !this.isClosedManually) {
             console.warn("WebSocket is already open or connecting. No need to reconnect.");
             return;
         }
@@ -135,7 +142,16 @@ export default class WebSocketClient {
     }
 
     close() {
-        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+        this.isClosedManually = true;
+        if (this.pingInterval) {
+            clearInterval(this.pingInterval);
+            this.pingInterval = null;
+        }
+
+        if (
+            this.socket &&
+            (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)
+        ) {
             this.socket.close();
         }
     }
