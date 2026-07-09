@@ -3,6 +3,7 @@ import { OtherPlayer, Player } from './Player';
 import { sprites } from './assets';
 import WebSocketClient from '../lib/websocket';
 import { getPlayerData } from '../lib/api';
+import type SFUClient from '../lib/sfu';
 
 export default class CityScene extends Phaser.Scene {
     private player: Player | null = null;
@@ -14,9 +15,11 @@ export default class CityScene extends Phaser.Scene {
     private map: Phaser.Tilemaps.Tilemap | null = null;
     private socket: WebSocketClient | null = null;
     private playerData!: PlayerData;
+    private sfu: SFUClient | null = null;
     private overlay: Phaser.GameObjects.Graphics | null = null;
     private overlayMask: Phaser.GameObjects.Graphics | null = null;
     private nears: Set<OtherPlayer> = new Set();
+    private wasNear = false;
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
     private chatInput: Phaser.GameObjects.DOMElement | null = null;
     private leftButton: Phaser.GameObjects.TileSprite | null = null;
@@ -29,9 +32,10 @@ export default class CityScene extends Phaser.Scene {
         super('CityScene');
     }
 
-    init({playerData, socket}: { playerData: PlayerData; socket: WebSocketClient }) {
+    init({playerData, socket, sfu}: { playerData: PlayerData; socket: WebSocketClient, sfu: SFUClient }) {
         this.playerData = playerData;
         this.socket = socket;
+        this.sfu = sfu;
     }
 
     preload() {
@@ -300,6 +304,14 @@ export default class CityScene extends Phaser.Scene {
             this.#hideChatInput();
         }
 
+        const isNearAnyone = this.nears.size > 0;
+        if (isNearAnyone !== this.wasNear) {
+            this.wasNear = isNearAnyone;
+
+            if (isNearAnyone) this.#joinVoiceCall();
+            else this.sfu?.leaveCall();
+        }
+
         // update lasttimestamp so throttle actually works
         const now = Date.now();
         if (this.player && this.socket && now - this.player.lasttimestamp >= 100) {
@@ -311,6 +323,12 @@ export default class CityScene extends Phaser.Scene {
                 now
             );
         }
+    }
+
+    async #joinVoiceCall() {
+        if (!this.sfu) return;
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        await this.sfu.joinCall(stream);
     }
     
 
@@ -467,6 +485,8 @@ export default class CityScene extends Phaser.Scene {
             this.socket.onLeave = () => {};
             this.socket.onMove = () => {};
             this.socket.onTalk = () => {};
+
+            this.socket.close();
         }
 
         for (const otherPlayer of this.otherPlayers.values()) {
@@ -478,6 +498,7 @@ export default class CityScene extends Phaser.Scene {
         this.nears.clear();
         this.player?.destroy();
         this.player = null;
+        this.sfu?.leaveCall();
     }
 }
 

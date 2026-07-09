@@ -1,17 +1,23 @@
 import { authState } from "./auth.svelte";
 
 enum WebSocketEvents {
-    // A new player has entered the world
+    // SFU related events
+    ROUTER_CAPABILITIES = "routerCapabilities",
+    CREATE_TRANSPORT = "createTransport",
+    CONNECT_TRANSPORT = "connectTransport",
+    PRODUCE = "produce",
+    CONSUME = "consume",
+    NEW_PRODUCER = "newProducer",
+    PRODUCER_CLOSED = "producerClosed",
+
+    // World events
     ENTER = "enter",
-    // A player has left the world
     LEAVE = "leave",
-    // A player has moved to a new position
     MOVE = "move",
-    // A player has sent a chat message
     TALK = "talk",
-    // A ping message to check if the connection is alive
+    
+    // Utility events
     PING = "ping",
-    // A pong message in response to a ping
     PONG = "pong"
 }
 
@@ -26,6 +32,11 @@ export default class WebSocketClient {
     private socket: WebSocket;
     private token: string;
 
+    onRouterCapabilities: (routerRtpCapabilities: any) => void = () => {};
+    onNewProducer: (producerId: string, playerId: string) => void = () => {};
+    onProducerClosed: (id: string) => void = () => {};
+    onSFUResponse: (type: string, payload: any) => void = () => {};
+    
     onEnter: (playerId: string) => void = () => {};
     onLeave: (playerId: string) => void = () => {};
     onMove: (playerId: string, x: number, y: number, animation: string, timestamp: number) => void = () => {};
@@ -56,6 +67,21 @@ export default class WebSocketClient {
         this.socket.onmessage = (e) => {
             const { type, payload } = JSON.parse(e.data);
             switch (type) {
+                case WebSocketEvents.ROUTER_CAPABILITIES:
+                    this.onRouterCapabilities(payload);
+                    break;
+                case WebSocketEvents.NEW_PRODUCER:
+                    this.onNewProducer(payload.producerId, payload.playerId);
+                    break;
+                case WebSocketEvents.PRODUCER_CLOSED:
+                    this.onProducerClosed(payload.consumerId || payload.producerId);
+                    break;
+                case WebSocketEvents.CREATE_TRANSPORT:
+                case WebSocketEvents.CONNECT_TRANSPORT:
+                case WebSocketEvents.PRODUCE:
+                case WebSocketEvents.CONSUME:
+                    this.onSFUResponse(type, payload);
+                    break;
                 case WebSocketEvents.ENTER:
                     this.onEnter(payload.playerId);
                     break;
@@ -111,6 +137,25 @@ export default class WebSocketClient {
         }
 
         this.socket.send(JSON.stringify({ type, payload }));
+    }
+
+    sendSignal(type: string, payload: any): Promise<any> {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error(`Timeout for ${type}`)), 15000);
+            
+            const originalHandler = this.onSFUResponse;
+            this.onSFUResponse = (respType: string, data: any) => {
+                if (respType === type) {
+                    clearTimeout(timeout);
+                    this.onSFUResponse = originalHandler;
+                    resolve(data);
+                } else if (originalHandler) {
+                    originalHandler(respType, data);
+                }
+            };
+
+            this.sendData(type as any, payload);
+        });
     }
 
     sendMove(x: number, y: number, animation: string, timestamp: number) {

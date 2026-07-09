@@ -4,6 +4,7 @@ dotenv.config();
 import cors from "cors";
 import express from "express";
 import { createServer } from "http";
+import config from "./lib/config";
 import SocketServer from "./lib/websocket";
 import PlayerServiceClient from "./lib/playerServiceImpl";
 import { createProxyMiddleware, fixRequestBody } from "http-proxy-middleware";
@@ -26,7 +27,7 @@ app.get("/", (req, res) => {
 app.use(
     "/user",
     createProxyMiddleware({
-        target: `http://${process.env.PLAYER_SERVICE_REST_ADDR ?? "127.0.0.1:4001"}/user`,
+        target: `${config.playerService.restAddr}/user`,
         changeOrigin: true,
         on: {
             proxyReq: fixRequestBody,
@@ -37,7 +38,7 @@ app.use(
 app.use(
     "/world",
     createProxyMiddleware({
-        target: `http://${process.env.PLAYER_SERVICE_REST_ADDR ?? "127.0.0.1:4001"}/world`,
+        target: `${config.playerService.restAddr}/world`,
         changeOrigin: true,
         on: {
             proxyReq: fixRequestBody,

@@ -4,11 +4,15 @@
     import CityScene from "../scripts/CityScene";
     import { navigate } from "svelte-routing";
     import WebSocketClient from "../lib/websocket";
+    import SFUClient from "../lib/sfu";
 
     let game: Phaser.Game | null = null;
     let fullscreen = false;
     let playerData: any = null;
     let socket: WebSocketClient | null = null;
+    let sfu: SFUClient | null = null;
+    let sfuReady = false;
+    let remoteStreams = new Map<string, MediaStream>();
     let connectionStatus = "Connecting...";
     let connectionColor = "#facc15";
     let latency = "--";
@@ -17,10 +21,10 @@
         latency === "--"
             ? "#9ca3af"
             : parseInt(latency) < 80
-            ? "#22c55e"
-            : parseInt(latency) < 150
-            ? "#f59e0b"
-            : "#ef4444";
+              ? "#22c55e"
+              : parseInt(latency) < 150
+                ? "#f59e0b"
+                : "#ef4444";
 
     function resizeGame() {
         setTimeout(() => {
@@ -60,6 +64,32 @@
                 return;
             }
 
+            const signal = (type: string, payload: any) => socket!.sendSignal(type, payload);
+
+            socket.onRouterCapabilities = async (rtpCapabilities) => {
+                try {
+                    sfu = new SFUClient(signal);
+                    await sfu.loadDevice(rtpCapabilities);
+                    
+                    sfu.onRemoteStream = (playerId, stream) => {
+                        remoteStreams.set(playerId, stream);
+                        remoteStreams = new Map(remoteStreams);
+                    };
+                    
+                    sfu.onRemoveStream = (playerId) => {
+                        remoteStreams.delete(playerId);
+                        remoteStreams = new Map(remoteStreams);
+                    };
+                    
+                } catch (error) {
+                    console.error("Error initializing SFU:", error);
+                }
+            };
+
+            socket.onNewProducer = async (producerId, playerId) =>
+                await sfu?.consumeProducer(producerId, playerId);
+            socket.onProducerClosed = (id) => sfu?.removeConsumer(id);
+
             socket.onOpen = () => {
                 connectionStatus = "Connected";
                 connectionColor = "#22c55e";
@@ -74,7 +104,7 @@
                 connectionColor = "#f59e0b";
                 latency = "--";
 
-                game?.scene.start("CityScene", { playerData, socket });
+                game?.scene.start("CityScene", { playerData, socket, sfu });
             };
 
             socket.onClose = () => {
@@ -126,10 +156,19 @@
             });
 
             game.events.on("ready", () => {
-                game?.scene.add("CityScene", CityScene, true, {
-                    playerData,
-                    socket,
-                });
+                const startScene = () => {
+                    game?.scene.add("CityScene", CityScene, true, {
+                        playerData,
+                        socket,
+                        sfu
+                    });
+                };
+
+                if (sfuReady || !socket) {
+                    startScene();
+                } else {
+                    setTimeout(startScene, 1500);
+                }
             });
 
             window.addEventListener("resize", resizeGame);
@@ -141,7 +180,6 @@
             }, 2000);
         }
     });
-    
 
     onDestroy(() => {
         socket?.close();
@@ -194,6 +232,27 @@
     <div id="game-wrapper">
         <div id="game-container"></div>
     </div>
+
+    {#if remoteStreams.size > 0}
+        <div class="video-dock">
+            {#each Array.from(remoteStreams.entries()) as [playerId, stream]}
+                <div class="video-card">
+                    <video
+                        autoplay
+                        playsinline
+                        on:loadedmetadata={(e) => {
+                            const el = /** @type {HTMLVideoElement} */ (e.currentTarget);
+                            if (el && el.srcObject !== stream) el.srcObject = stream;
+                        }}
+                    />
+
+                    <div class="video-label">
+                        {playerId}
+                    </div>
+                </div>
+            {/each}
+        </div>
+    {/if}
 </div>
 
 <style>
@@ -284,5 +343,58 @@
         inset: 0;
         width: 100%;
         height: 100%;
+    }
+
+    .video-dock {
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+
+        max-height: 80vh;
+        overflow-y: auto;
+
+        z-index: 1000;
+    }
+
+    .video-card {
+        position: relative;
+
+        width: 220px;
+        aspect-ratio: 16 / 9;
+
+        border-radius: 12px;
+        overflow: hidden;
+
+        background: #111827;
+
+        border: 2px solid rgba(6, 182, 212, 0.35);
+
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .video-card video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .video-label {
+        position: absolute;
+        left: 8px;
+        bottom: 8px;
+
+        padding: 4px 8px;
+
+        border-radius: 6px;
+
+        background: rgba(0, 0, 0, 0.6);
+
+        color: white;
+        font-size: 13px;
     }
 </style>

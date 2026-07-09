@@ -19,6 +19,7 @@
         "http-proxy-middleware": "^4.1.1",
         "ioredis": "^5.4.1",
         "jsonwebtoken": "^9.0.2",
+        "mediasoup": "^3.21.0",
         "uuid": "^11.0.3",
         "ws": "^8.18.0"
     },

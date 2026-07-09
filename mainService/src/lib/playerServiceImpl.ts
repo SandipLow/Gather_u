@@ -2,6 +2,7 @@ import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import path from "path";
 import PlayerService from "./playerService";
+import config from "./config";
 
 const PROTO_PATH = path.join(__dirname, "../../proto/player.proto");
 const pkgDef = protoLoader.loadSync(PROTO_PATH, {
@@ -12,7 +13,7 @@ const pkgDef = protoLoader.loadSync(PROTO_PATH, {
     oneofs:       true,
 });
 const proto  = grpc.loadPackageDefinition(pkgDef) as any;
-const playerServiceGRPCAddr = process.env.PLAYER_SERVICE_GRPC_ADDR ?? "localhost:50051";
+const playerServiceGRPCAddr = config.playerService.grpcAddr;
 
 // Shared persistent channel — one connection, multiplexed
 const client = new proto.player.PlayerService(
