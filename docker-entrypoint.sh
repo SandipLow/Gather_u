@@ -72,10 +72,7 @@ echo "Starting mainService..."
 cd /app/mainService
 
 
-PORT="${PORT:-10000}" \
-REDIS_URI="${REDIS_URI:-127.0.0.1:6379}" \
-PLAYER_SERVICE_REST_ADDR="${PLAYER_SERVICE_REST_ADDR:-127.0.0.1:4001}" \
-PLAYER_SERVICE_GRPC_ADDR="${PLAYER_SERVICE_GRPC_ADDR:-127.0.0.1:50051}" \
+PORT="${PORT:-3001}" \
 yarn start &
 
 

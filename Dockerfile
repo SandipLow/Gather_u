@@ -7,7 +7,7 @@ WORKDIR /app
 
 
 # Install redis for runtime later
-RUN apk add --no-cache redis
+RUN apk add --no-cache redis python3 py3-pip linux-headers make g++ && ln -sf /usr/bin/python3 /usr/bin/python
 
 
 # Copy services
