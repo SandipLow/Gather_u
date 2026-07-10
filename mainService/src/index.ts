@@ -11,7 +11,7 @@ import { createProxyMiddleware, fixRequestBody } from "http-proxy-middleware";
 
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3001');
+const PORT = config.PORT;
 
 const server = createServer(app);
 const playerService = new PlayerServiceClient();

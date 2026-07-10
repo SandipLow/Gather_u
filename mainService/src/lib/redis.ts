@@ -20,11 +20,6 @@ export default class RedisPubSub {
         const redisUsername = config.redis.username;
         const redisPassword = config.redis.password;
 
-        if (!redisUrl) {
-            console.error('Redis URI not provided');
-            process.exit(1);
-        }
-
         const [host, portText] = redisUrl.split(':');
         const redisConfig = {
             host,
