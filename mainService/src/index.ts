@@ -8,6 +8,9 @@ import config from "./lib/config";
 import SocketServer from "./lib/websocket";
 import PlayerServiceClient from "./lib/playerServiceImpl";
 import { createProxyMiddleware, fixRequestBody } from "http-proxy-middleware";
+import PlayerManager from "./lib/playermanager";
+import SFUManager from "./lib/sfu";
+import SFURouter from "./router/sfu";
 
 
 const app = express();
@@ -15,6 +18,9 @@ const PORT = config.PORT;
 
 const server = createServer(app);
 const playerService = new PlayerServiceClient();
+const playerManager = new PlayerManager();
+const sfuManager = new SFUManager(playerManager);
+const sfuRouter = new SFURouter(playerManager, sfuManager);
 
 
 app.use(cors());
@@ -46,9 +52,14 @@ app.use(
     })
 );
 
+app.use(
+    '/sfu',
+    sfuRouter.getRouter()
+)
+
 
 // Create and configure the WebSocket server
-const socket = new SocketServer(server, playerService);
+const socket = new SocketServer(playerService, playerManager, server);
 
 // Start the HTTP server
 server.listen(PORT, () => {

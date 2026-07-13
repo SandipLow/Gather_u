@@ -1,105 +1,130 @@
 import { Device } from "mediasoup-client";
 import type { Consumer, Producer, Transport } from "mediasoup-client/types";
+import * as api from "./api";
 
 
 export default class SFUClient {
     private device = new Device();
     private sendTransport?: Transport;
     private recvTransport?: Transport;
-    private producers = new Map<string, Producer>();
-    private consumers = new Map<string, Consumer>();
+    private videoProducer?: Producer;
+    private audioProducer?: Producer;
+    isReady: boolean = false;
 
-    onRemoteStream: (playerId: string, stream: MediaStream) => void = () => {};
-    onRemoveStream: (playerId: string) => void = () => {};
+    onRemoteStreamAdded: (pId: string, stream: MediaStream) => void = () => { };
+    onRemoteStreamRemoved: (pId: string) => void = () => { };
 
-    constructor(private signal: (type: string, payload: any) => Promise<any>) {}
+    constructor(
+        private stream: MediaStream,
+        private playerId: string
+    ) {
+        this.#setup()
+            .then(() => {
+                console.log("[SFU] Setup completed successfully.");
+            })
+            .catch((error) => {
+                console.error("[SFU] Setup failed:", error);
+            });
+    }
 
-    async loadDevice(routerRtpCapabilities: any) {
+    async #setup() {
+        const routerRtpCapabilities = await api.getRouterCapabilities();
         await this.device.load({ routerRtpCapabilities });
-    }
 
-    async joinCall(localStream: MediaStream) {
-        await this.#createSendTransport(localStream);
-        await this.#createRecvTransport();
-    }
+        const { sendTransport, recvTransport } = await api.createTransport(this.playerId);
+        this.sendTransport = this.device.createSendTransport(sendTransport);
+        this.recvTransport = this.device.createRecvTransport(recvTransport);
 
-    async consumeProducer(producerId: string, playerId: string) {
-        if (!this.recvTransport) return;
-
-        const params = await this.signal("consume", {
-            transportId:     this.recvTransport.id,
-            producerId,
-            rtpCapabilities: this.device.rtpCapabilities,
+        this.sendTransport.on("connect", async ({ dtlsParameters }, callback, errback) => {
+            try {
+                await api.connectTransport(this.playerId, "send", dtlsParameters);
+                callback();
+            } catch (error) {
+                errback(error as Error);
+            }
         });
 
-        const consumer = await this.recvTransport.consume({
-            id:            params.consumerId,
-            producerId:    params.producerId,
-            kind:          params.kind,
-            rtpParameters: params.rtpParameters,
+        this.recvTransport.on("connect", async ({ dtlsParameters }, callback, errback) => {
+            try {
+                await api.connectTransport(this.playerId, "recv", dtlsParameters);
+                callback();
+            } catch (error) {
+                errback(error as Error);
+            }
         });
 
-        this.consumers.set(consumer.id, consumer);
-
-        consumer.on("transportclose", () => this.consumers.delete(consumer.id));
-
-        const stream = new MediaStream([consumer.track]);
-        this.onRemoteStream(playerId, stream);
-    }
-
-    removeConsumer(consumerId: string) {
-        this.consumers.get(consumerId)?.close();
-        this.consumers.delete(consumerId);
-    }
-
-    leaveCall() {
-        this.sendTransport?.close();
-        this.recvTransport?.close();
-        this.producers.clear();
-        this.consumers.clear();
-    }
-
-    async #createSendTransport(localStream: MediaStream) {
-        const params = await this.signal("createTransport", {});
-
-        this.sendTransport = this.device.createSendTransport(params);
-
-        this.sendTransport.on("connect", async ({ dtlsParameters }, resolve) => {
-            await this.signal("connectTransport", {
-                transportId: this.sendTransport!.id,
-                dtlsParameters,
-            });
-            resolve();
+        this.sendTransport.on("produce", async ({ kind, rtpParameters }, callback, errback) => {
+            try {
+                const { producerId } = await api.produce(this.playerId, kind, rtpParameters);
+                callback({ id: producerId });
+            } catch (error) {
+                errback(error as Error);
+            }
         });
 
-        this.sendTransport.on("produce", async ({ kind, rtpParameters }, resolve) => {
-            const { producerId } = await this.signal("produce", {
-                transportId: this.sendTransport!.id,
-                kind,
-                rtpParameters,
-            });
-            resolve({ id: producerId });
-        });
+        this.#produce();
 
-        for (const track of localStream.getTracks()) {
-            const producer = await this.sendTransport.produce({ track });
-            this.producers.set(track.kind, producer);
+        this.isReady = true;
+    }
+
+    #produce() {
+        if (!this.sendTransport) {
+            console.error("[SFU] Send transport is not initialized.");
+            return;
+        }
+
+        const videoTrack = this.stream.getVideoTracks()[0];
+        const audioTrack = this.stream.getAudioTracks()[0];
+
+        if (videoTrack) {
+            this.sendTransport.produce({ track: videoTrack })
+                .then((producer) => {
+                    this.videoProducer = producer;
+                })
+                .catch((error) => {
+                    console.error("[SFU] Error producing video:", error);
+                });
+        }
+
+        if (audioTrack) {
+            this.sendTransport.produce({ track: audioTrack })
+                .then((producer) => {
+                    this.audioProducer = producer;
+                })
+                .catch((error) => {
+                    console.error("[SFU] Error producing audio:", error);
+                });
         }
     }
 
-    async #createRecvTransport() {
-        const params = await this.signal("createTransport", {});
+    async requestRemoteStream(pId: string) {
+        if (!this.recvTransport) return;
 
-        this.recvTransport = this.device.createRecvTransport(params);
+        const consumers = await api.getStream(this.playerId, pId, this.device.recvRtpCapabilities);
+        const stream = new MediaStream();
 
-        this.recvTransport.on("connect", async ({ dtlsParameters }, resolve) => {
-            await this.signal("connectTransport", {
-                transportId: this.recvTransport!.id,
-                dtlsParameters,
+        for (const info of consumers) {
+            const consumer = await this.recvTransport.consume({
+                id: info.consumerId,
+                producerId: info.producerId,
+                kind: info.kind,
+                rtpParameters: info.rtpParameters
             });
-            resolve();
-        });
+
+            stream.addTrack(consumer.track);
+        }
+
+        this.onRemoteStreamAdded(pId,stream);
+    }
+
+    removeRemoteStream(pId: string) {
+        api.removeStream(this.playerId, pId);
+        this.onRemoteStreamRemoved(pId);
     }
 
 
+    close() {
+        this.sendTransport?.close();
+        this.recvTransport?.close();
+    }
 }

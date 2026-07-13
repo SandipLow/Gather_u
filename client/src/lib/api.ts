@@ -123,3 +123,97 @@ export const createPlayer = async (playerData: any, token: string) => {
 
     return res.json();
 }
+
+export const getRouterCapabilities = async () => {
+    const res = await fetch(`${API_URL}/sfu/capabilities`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    });
+
+    if (!res.ok) {
+        throw new Error(`Failed to fetch router capabilities`);
+    }
+
+    return res.json();
+}
+
+export const createTransport = async (playerId: string) => {
+    const res = await fetch(`${API_URL}/sfu/transport/${playerId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    });
+
+    if (!res.ok) {
+        throw new Error(`Failed to create transport for player ${playerId}`);
+    }
+
+    return res.json();
+}
+
+export const connectTransport = async (playerId: string, direction: "send" | "recv", dtlsParameters: any) => {
+    const res = await fetch(`${API_URL}/sfu/connect/${playerId}/${direction}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ dtlsParameters }),
+    });
+
+    if (!res.ok) {
+        throw new Error(`Failed to connect ${direction} transport for player ${playerId}`);
+    }
+
+    return res.json();
+}
+
+export const produce = async (playerId: string, kind: "audio" | "video", rtpParameters: any) => {
+    const res = await fetch(`${API_URL}/sfu/produce/${playerId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ kind, rtpParameters }),
+    });
+
+    if (!res.ok) {
+        throw new Error(`Failed to produce ${kind} for player ${playerId}`);
+    }
+
+    return res.json();
+}
+
+export const getStream = async (playerId: string, targetPlayerId: string, rtpCapabilities: any) => {
+    const res = await fetch(`${API_URL}/sfu/getstream/${playerId}/${targetPlayerId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rtpCapabilities }),
+    });
+
+    if (!res.ok) {
+        throw new Error(`Failed to get stream for player ${playerId}`);
+    }
+
+    return res.json();
+}
+
+export const removeStream = async (consumerPlayerId: string, targetPlayerId: string) => {
+    const res = await fetch(`${API_URL}/sfu/removeStream/${consumerPlayerId}/${targetPlayerId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    });
+
+    if (!res.ok) {
+        throw new Error(`Failed to remove stream for consumer player ${consumerPlayerId} and target player ${targetPlayerId}`);
+    }
+
+    return res.json();
+}
+
