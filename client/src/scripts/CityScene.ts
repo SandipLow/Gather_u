@@ -272,9 +272,18 @@ export default class CityScene extends Phaser.Scene {
             this.player.update();
 
             for (const [playerId, otherPlayer] of this.otherPlayers) {
+                const wasNear = this.nears.has(otherPlayer);
                 const isNear = otherPlayer.checkProximity(this.player);
-                if (isNear) this.nears.add(otherPlayer);
-                else this.nears.delete(otherPlayer);
+
+                if (isNear === wasNear) continue;
+
+                if (isNear) {
+                    this.nears.add(otherPlayer);
+                    this.sfu?.requestRemoteStream(playerId);
+                } else {
+                    this.nears.delete(otherPlayer);
+                    this.sfu?.removeRemoteStream(playerId);
+                }
             }
         }
 
@@ -304,14 +313,6 @@ export default class CityScene extends Phaser.Scene {
             this.#hideChatInput();
         }
 
-        const isNearAnyone = this.nears.size > 0;
-        if (isNearAnyone !== this.wasNear) {
-            this.wasNear = isNearAnyone;
-
-            if (isNearAnyone) this.#joinVoiceCall();
-            else this.sfu?.leaveCall();
-        }
-
         // update lasttimestamp so throttle actually works
         const now = Date.now();
         if (this.player && this.socket && now - this.player.lasttimestamp >= 100) {
@@ -323,12 +324,6 @@ export default class CityScene extends Phaser.Scene {
                 now
             );
         }
-    }
-
-    async #joinVoiceCall() {
-        if (!this.sfu) return;
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        await this.sfu.joinCall(stream);
     }
     
 
@@ -362,7 +357,6 @@ export default class CityScene extends Phaser.Scene {
 
         if (this.otherPlayers.has(playerId)) {
             this.otherPlayers.get(playerId)!.destroy();
-            this.nears.delete(this.otherPlayers.get(playerId)!);
             this.otherPlayers.delete(playerId);
             this.moveBuffer.delete(playerId); // ← clean up buffer
         }
@@ -498,7 +492,6 @@ export default class CityScene extends Phaser.Scene {
         this.nears.clear();
         this.player?.destroy();
         this.player = null;
-        this.sfu?.leaveCall();
     }
 }
 

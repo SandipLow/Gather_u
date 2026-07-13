@@ -11,12 +11,7 @@ const worker :Array<{
 let workerIndex = 0;
 
 export const createWorkerRouter = async () => {
-    const worker = await mediasoup.createWorker({
-        logLevel: config.mediasoup.worker.logLevel,
-        logTags: config.mediasoup.worker.logTags,
-        rtcMinPort: config.mediasoup.worker.rtcMinPort,
-        rtcMaxPort: config.mediasoup.worker.rtcMaxPort,
-    });
+    const worker = await mediasoup.createWorker(config.mediasoup.worker);
 
     worker.on("died", (error) => {
         console.error("mediasoup worker has died", error);

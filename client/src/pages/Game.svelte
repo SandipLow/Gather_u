@@ -10,12 +10,27 @@
     let fullscreen = false;
     let playerData: any = null;
     let socket: WebSocketClient | null = null;
+    let stream: MediaStream | null = null;
     let sfu: SFUClient | null = null;
-    let sfuReady = false;
-    let remoteStreams = new Map<string, MediaStream>();
+    let remoteStreams = new Map<string, MediaStream>(); // playerId -> MediaStream
     let connectionStatus = "Connecting...";
     let connectionColor = "#facc15";
     let latency = "--";
+
+    function attachStream(node: HTMLVideoElement, mediaStream: MediaStream) {
+        node.srcObject = mediaStream;
+        void node.play().catch(() => {});
+
+        return {
+            update(nextStream: MediaStream) {
+                node.srcObject = nextStream;
+                void node.play().catch(() => {});
+            },
+            destroy() {
+                node.srcObject = null;
+            },
+        };
+    }
 
     $: pingColor =
         latency === "--"
@@ -56,40 +71,6 @@
             playerData = history.state.playerData;
             socket = await WebSocketClient.create(playerData.id);
 
-            if (!socket) {
-                console.error("WebSocket connection failed");
-                setTimeout(() => {
-                    window.location.href = "/";
-                }, 2000);
-                return;
-            }
-
-            const signal = (type: string, payload: any) => socket!.sendSignal(type, payload);
-
-            socket.onRouterCapabilities = async (rtpCapabilities) => {
-                try {
-                    sfu = new SFUClient(signal);
-                    await sfu.loadDevice(rtpCapabilities);
-                    
-                    sfu.onRemoteStream = (playerId, stream) => {
-                        remoteStreams.set(playerId, stream);
-                        remoteStreams = new Map(remoteStreams);
-                    };
-                    
-                    sfu.onRemoveStream = (playerId) => {
-                        remoteStreams.delete(playerId);
-                        remoteStreams = new Map(remoteStreams);
-                    };
-                    
-                } catch (error) {
-                    console.error("Error initializing SFU:", error);
-                }
-            };
-
-            socket.onNewProducer = async (producerId, playerId) =>
-                await sfu?.consumeProducer(producerId, playerId);
-            socket.onProducerClosed = (id) => sfu?.removeConsumer(id);
-
             socket.onOpen = () => {
                 connectionStatus = "Connected";
                 connectionColor = "#22c55e";
@@ -117,6 +98,28 @@
                 connectionStatus = "Connection Error";
                 connectionColor = "#ef4444";
                 latency = "--";
+            };
+
+            stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: true,
+            });
+
+            sfu = new SFUClient(stream, playerData.id);
+
+            sfu.onRemoteStreamAdded = (
+                playerId: string,
+                stream: MediaStream,
+            ) => {
+                remoteStreams.set(playerId, stream);
+
+                remoteStreams = new Map(remoteStreams); // Trigger Svelte reactivity
+            };
+
+            sfu.onRemoteStreamRemoved = (playerId: string) => {
+                remoteStreams.delete(playerId);
+
+                remoteStreams = new Map(remoteStreams); // Trigger Svelte reactivity
             };
 
             game = new Phaser.Game({
@@ -160,11 +163,11 @@
                     game?.scene.add("CityScene", CityScene, true, {
                         playerData,
                         socket,
-                        sfu
+                        sfu,
                     });
                 };
 
-                if (sfuReady || !socket) {
+                if (sfu && sfu.isReady && socket) {
                     startScene();
                 } else {
                     setTimeout(startScene, 1500);
@@ -183,6 +186,7 @@
 
     onDestroy(() => {
         socket?.close();
+        sfu?.close();
         game?.destroy(true);
 
         game = null;
@@ -235,16 +239,10 @@
 
     {#if remoteStreams.size > 0}
         <div class="video-dock">
-            {#each Array.from(remoteStreams.entries()) as [playerId, stream]}
+            {#each Array.from(remoteStreams.entries()) as [playerId, stream] (playerId)}
                 <div class="video-card">
-                    <video
-                        autoplay
-                        playsinline
-                        on:loadedmetadata={(e) => {
-                            const el = /** @type {HTMLVideoElement} */ (e.currentTarget);
-                            if (el && el.srcObject !== stream) el.srcObject = stream;
-                        }}
-                    />
+                    <video use:attachStream={stream} autoplay muted playsinline
+                    ></video>
 
                     <div class="video-label">
                         {playerId}
@@ -259,6 +257,7 @@
     .page {
         width: 100%;
         height: 100vh;
+        position: relative;
         display: flex;
         flex-direction: column;
         background: #020617;

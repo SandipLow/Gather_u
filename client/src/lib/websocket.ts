@@ -1,24 +1,15 @@
 import { authState } from "./auth.svelte";
 
 enum WebSocketEvents {
-    // SFU related events
-    ROUTER_CAPABILITIES = "routerCapabilities",
-    CREATE_TRANSPORT = "createTransport",
-    CONNECT_TRANSPORT = "connectTransport",
-    PRODUCE = "produce",
-    CONSUME = "consume",
-    NEW_PRODUCER = "newProducer",
-    PRODUCER_CLOSED = "producerClosed",
-
     // World events
     ENTER = "enter",
     LEAVE = "leave",
     MOVE = "move",
     TALK = "talk",
-    
+
     // Utility events
     PING = "ping",
-    PONG = "pong"
+    PONG = "pong",
 }
 
 // Interval to send ping messages in milliseconds
@@ -29,33 +20,26 @@ const LATENCY_CHECK_INTERVAL = 5000;
  * It provides methods to send messages to the server for player events such as entering, leaving, moving, and talking.
  */
 export default class WebSocketClient {
-    private socket: WebSocket;
-    private token: string;
     private isClosedManually: boolean = false;
     private pingInterval: ReturnType<typeof setInterval> | null = null;
 
-    onRouterCapabilities: (routerRtpCapabilities: any) => void = () => {};
-    onNewProducer: (producerId: string, playerId: string) => void = () => {};
-    onProducerClosed: (id: string) => void = () => {};
-    onSFUResponse: (type: string, payload: any) => void = () => {};
-    
-    onEnter: (playerId: string) => void = () => {};
-    onLeave: (playerId: string) => void = () => {};
-    onMove: (playerId: string, x: number, y: number, animation: string, timestamp: number) => void = () => {};
-    onTalk: (playerId: string, message: string) => void = () => {};
-    
-    onOpen: () => void = () => {};
-    onReconnect: () => void = () => {};
-    onPong: (latency: number) => void = () => {};
-    onError: (error: Event) => void = () => {};
-    onClose: () => void = () => {};
+    onEnter: (playerId: string) => void = () => { };
+    onLeave: (playerId: string) => void = () => { };
+    onMove: (playerId: string, x: number, y: number, animation: string, timestamp: number) => void = () => { };
+    onTalk: (playerId: string, message: string) => void = () => { };
 
-    private constructor(socket: WebSocket, token: string) {
-        this.socket = socket;
-        this.token = token;
+    onOpen: () => void = () => { };
+    onReconnect: () => void = () => { };
+    onPong: (latency: number) => void = () => { };
+    onError: (error: Event) => void = () => { };
+    onClose: () => void = () => { };
 
+    private constructor(
+        private socket: WebSocket, 
+        private token: string
+    ) {
         this.#setupEventHandlers();
-        
+
         this.pingInterval = setInterval(() => {
             this.sendData(WebSocketEvents.PING, { timestamp: Date.now() });
         }, LATENCY_CHECK_INTERVAL);
@@ -69,21 +53,6 @@ export default class WebSocketClient {
         this.socket.onmessage = (e) => {
             const { type, payload } = JSON.parse(e.data);
             switch (type) {
-                case WebSocketEvents.ROUTER_CAPABILITIES:
-                    this.onRouterCapabilities(payload);
-                    break;
-                case WebSocketEvents.NEW_PRODUCER:
-                    this.onNewProducer(payload.producerId, payload.playerId);
-                    break;
-                case WebSocketEvents.PRODUCER_CLOSED:
-                    this.onProducerClosed(payload.consumerId || payload.producerId);
-                    break;
-                case WebSocketEvents.CREATE_TRANSPORT:
-                case WebSocketEvents.CONNECT_TRANSPORT:
-                case WebSocketEvents.PRODUCE:
-                case WebSocketEvents.CONSUME:
-                    this.onSFUResponse(type, payload);
-                    break;
                 case WebSocketEvents.ENTER:
                     this.onEnter(payload.playerId);
                     break;
@@ -110,7 +79,7 @@ export default class WebSocketClient {
 
             console.warn("WebSocket connection closed. Attempting to reconnect...");
             this.onClose();
-            
+
             setTimeout(() => {
                 this.reConnect();
             }, 2000);
@@ -123,13 +92,6 @@ export default class WebSocketClient {
         };
     }
 
-    /**
-     * Creates a new WebSocketClient instance and sets up event handlers for incoming messages.
-     * @param `handleEnter` handler for when a new player enters the world
-     * @param `handleLeave` handler for when a player leaves the world
-     * @param `handleMove` handler for when a player moves to a new position
-     * @param `handleTalk` handler for when a player sends a chat message
-     */
     static async create(playerId: string) {
         const token = await authState.getPlayerToken(playerId);
         const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3000';
@@ -144,25 +106,6 @@ export default class WebSocketClient {
         }
 
         this.socket.send(JSON.stringify({ type, payload }));
-    }
-
-    sendSignal(type: string, payload: any): Promise<any> {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error(`Timeout for ${type}`)), 15000);
-            
-            const originalHandler = this.onSFUResponse;
-            this.onSFUResponse = (respType: string, data: any) => {
-                if (respType === type) {
-                    clearTimeout(timeout);
-                    this.onSFUResponse = originalHandler;
-                    resolve(data);
-                } else if (originalHandler) {
-                    originalHandler(respType, data);
-                }
-            };
-
-            this.sendData(type as any, payload);
-        });
     }
 
     sendMove(x: number, y: number, animation: string, timestamp: number) {
