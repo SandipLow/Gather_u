@@ -11,6 +11,7 @@ import { createProxyMiddleware, fixRequestBody } from "http-proxy-middleware";
 import PlayerManager from "./lib/playermanager";
 import SFUManager from "./lib/sfu";
 import SFURouter from "./router/sfu";
+import debugRouter from "./router/debug";
 
 
 const app = express();
@@ -56,6 +57,11 @@ app.use(
     '/sfu',
     sfuRouter.getRouter()
 )
+
+app.use(
+    "/debug",
+    debugRouter
+);
 
 
 // Create and configure the WebSocket server

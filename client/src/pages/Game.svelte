@@ -278,6 +278,7 @@
                         autoplay 
                         muted 
                         playsinline
+                        controls
                     ></video>
 
                     <div class="video-label">
