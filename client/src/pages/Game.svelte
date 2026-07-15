@@ -5,6 +5,7 @@
     import { navigate } from "svelte-routing";
     import WebSocketClient from "../lib/websocket";
     import SFUClient from "../lib/sfu";
+    import * as api from "../lib/api";
 
     let game: Phaser.Game | null = null;
     let fullscreen = false;
@@ -12,19 +13,24 @@
     let socket: WebSocketClient | null = null;
     let stream: MediaStream | null = null;
     let sfu: SFUClient | null = null;
-    let remoteStreams = new Map<string, MediaStream>(); // playerId -> MediaStream
+    let remoteStreams = new Map<string, PlayerData & { stream: MediaStream }>(); // playerId -> PlayerData + MediaStream
     let connectionStatus = "Connecting...";
     let connectionColor = "#facc15";
     let latency = "--";
 
-    function attachStream(node: HTMLVideoElement, mediaStream: MediaStream) {
+    function attachStream(node: HTMLVideoElement, mediaStream: MediaStream|null) {
+        if (!mediaStream) {
+            console.warn("No media stream provided for video element");
+            return;
+        }
+
         node.srcObject = mediaStream;
-        void node.play().catch(() => {});
+        void node.play().catch(console.error);
 
         return {
             update(nextStream: MediaStream) {
                 node.srcObject = nextStream;
-                void node.play().catch(() => {});
+                void node.play().catch(console.error);
             },
             destroy() {
                 node.srcObject = null;
@@ -111,9 +117,21 @@
                 playerId: string,
                 stream: MediaStream,
             ) => {
-                remoteStreams.set(playerId, stream);
+                api.getPlayerData(playerId)
+                    .then((playerData) => {
+                        remoteStreams.set(playerId, { ...playerData, stream });
+                    })
+                    .catch((error) => {
+                        console.error(
+                            `Failed to fetch player data for ${playerId}:`,
+                            error,
+                        );
 
-                remoteStreams = new Map(remoteStreams); // Trigger Svelte reactivity
+                        remoteStreams.set(playerId, { id: "-1", name: "Unknown", wealth: 0, checkpoint: {x: -1, y: -1}, spritesheet: "", stream });
+                    })
+                    .finally(() => {
+                        remoteStreams = new Map(remoteStreams); // Trigger Svelte reactivity
+                    });
             };
 
             sfu.onRemoteStreamRemoved = (playerId: string) => {
@@ -239,13 +257,31 @@
 
     {#if remoteStreams.size > 0}
         <div class="video-dock">
-            {#each Array.from(remoteStreams.entries()) as [playerId, stream] (playerId)}
+            <div class="video-card">
+                <video 
+                    use:attachStream={stream} 
+                    autoplay 
+                    muted 
+                    playsinline
+                    controls
+                ></video>
+
+                <div class="video-label">
+                    You
+                </div>
+            </div>
+
+            {#each Array.from(remoteStreams.entries()) as [playerId, player] (playerId)}
                 <div class="video-card">
-                    <video use:attachStream={stream} autoplay muted playsinline
+                    <video 
+                        use:attachStream={player.stream} 
+                        autoplay 
+                        muted 
+                        playsinline
                     ></video>
 
                     <div class="video-label">
-                        {playerId}
+                        {player.name}
                     </div>
                 </div>
             {/each}

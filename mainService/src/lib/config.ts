@@ -1,4 +1,4 @@
-import { RtpCodecCapability, WorkerLogLevel, WorkerLogTag } from 'mediasoup/types';
+import { RtpCodecCapability, WebRtcTransportOptions, WorkerLogLevel, WorkerLogTag } from 'mediasoup/types';
 import os from 'os'
 
 const config = {
@@ -49,15 +49,23 @@ const config = {
         },
 
         transport: {
-            listenIps: [{ 
-                ip: "0.0.0.0", 
-                announcedIp: process.env.ANNOUNCED_IP ?? "127.0.0.1" 
-            }],
-            enableUdp:       true,
-            enableTcp:       true,
-            preferUdp:       true,
+            listenInfos: [
+                { 
+                    protocol: "udp",
+                    ip: "0.0.0.0", 
+                    announcedAddress: process.env.ANNOUNCED_ADDRESS ?? "127.0.0.1"
+                },
+                {
+                    protocol: "tcp",
+                    ip: "0.0.0.0",
+                    announcedAddress: process.env.ANNOUNCED_ADDRESS ?? "127.0.0.1"
+                }
+            ],
+            enableUdp: true,
+            enableTcp: true,
+            preferUdp: true,
             initialAvailableOutgoingBitrate: 1000000,
-        },
+        } as WebRtcTransportOptions,
     }
 
 };
