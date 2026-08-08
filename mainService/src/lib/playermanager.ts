@@ -1,12 +1,7 @@
-import { WebRtcTransport, Producer, Consumer } from "mediasoup/types";
 import { WebSocket } from "ws";
 
 type PlayerConnects = {
     ws: WebSocket;
-    sendTransport?: WebRtcTransport;
-    recvTransport?: WebRtcTransport;
-    producers: Map<string, Producer>; // kind -> Producer
-    consumers: Map<string, Consumer>; // producerId -> Consumer
 }
 
 export default class PlayerManager {
@@ -16,7 +11,7 @@ export default class PlayerManager {
         if (this.players.has(playerId)) {
             console.warn(`Player with ID ${playerId} already exists. Overwriting.`);
         }
-        this.players.set(playerId, { ws, producers: new Map(), consumers: new Map() });
+        this.players.set(playerId, { ws });
     }
 
     removePlayer(playerId: string) {
@@ -42,21 +37,7 @@ export default class PlayerManager {
             return;
         }
 
-        // Close all producers
-        for (const producer of player.producers.values()) {
-            producer.close();
-        }
-        player.producers.clear();
-
-        // Close all consumers
-        for (const consumer of player.consumers.values()) {
-            consumer.close();
-        }
-        player.consumers.clear();
-
-        // Close transports
-        player.sendTransport?.close();
-        player.recvTransport?.close();
+        player.ws.close();
 
         // Remove the player from the map
         this.players.delete(playerId);

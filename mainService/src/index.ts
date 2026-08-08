@@ -9,8 +9,6 @@ import SocketServer from "./lib/websocket";
 import PlayerServiceClient from "./lib/playerServiceImpl";
 import { createProxyMiddleware, fixRequestBody } from "http-proxy-middleware";
 import PlayerManager from "./lib/playermanager";
-import SFUManager from "./lib/sfu";
-import SFURouter from "./router/sfu";
 import debugRouter from "./router/debug";
 import path from "path";
 
@@ -21,8 +19,6 @@ const PORT = config.PORT;
 const server = createServer(app);
 const playerService = new PlayerServiceClient();
 const playerManager = new PlayerManager();
-const sfuManager = new SFUManager(playerManager);
-const sfuRouter = new SFURouter(sfuManager);
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(process.cwd(), 'pages'));
@@ -58,7 +54,13 @@ app.use(
 
 app.use(
     '/sfu',
-    sfuRouter.getRouter()
+    createProxyMiddleware({
+        target: `${config.sfuService.restAddr}/sfu`,
+        changeOrigin: true,
+        on: {
+            proxyReq: fixRequestBody,
+        },
+    })
 )
 
 app.use(
