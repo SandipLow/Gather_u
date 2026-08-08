@@ -12,6 +12,7 @@ import PlayerManager from "./lib/playermanager";
 import SFUManager from "./lib/sfu";
 import SFURouter from "./router/sfu";
 import debugRouter from "./router/debug";
+import path from "path";
 
 
 const app = express();
@@ -23,6 +24,8 @@ const playerManager = new PlayerManager();
 const sfuManager = new SFUManager(playerManager);
 const sfuRouter = new SFURouter(playerManager, sfuManager);
 
+app.set('view engine', 'ejs');
+app.set('views', path.join(process.cwd(), 'pages'));
 
 app.use(cors());
 app.use(express.json());

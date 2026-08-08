@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import config from '../lib/config';
 import { verifyJWT } from '../lib/auth';
+import { marked } from 'marked';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
-
 
 const verifyToken = (req: any, res: any, next: any) => {
     try {
@@ -18,6 +20,17 @@ const verifyToken = (req: any, res: any, next: any) => {
         res.status(401).json({ message: 'Unauthorized' });
     }
 }
+
+router.get('/docs', (req, res) => {
+    const filePath = path.join(__dirname, '../../docs.md');
+    fs.readFile(filePath, 'utf8', (err, data) => {
+        if (err) {
+            return res.status(500).send('Error reading documentation file.');
+        }
+        const content = marked(data);
+        res.render('docs', { content });
+    });
+});
 
 router.use(verifyToken);
 
