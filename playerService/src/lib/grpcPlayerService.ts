@@ -97,7 +97,11 @@ const grpcPlayerService: grpc.UntypedServiceImplementation = {
             if (!resolved) return;
             const { player, world } = resolved;
 
-            world.move(player, x, y, animation, timestamp);
+            // Store 1FPS data only
+            if (Date.now() - timestamp >= 1000) {
+                world.move(player, x, y, animation, timestamp);
+            }
+
 
             const nearby = world.getNearbyPlayers(player, 800)
                 .filter(p => p.id !== playerId);
