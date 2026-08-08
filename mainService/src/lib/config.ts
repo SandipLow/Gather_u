@@ -8,12 +8,12 @@ const config = {
     },
 
     playerService: {
-        restAddr: process.env.PLAYER_SERVICE_REST_ADDR ?? "http://localhost:4001" ,
-        grpcAddr: process.env.PLAYER_SERVICE_GRPC_ADDR ?? "localhost:50051",
+        restAddr: process.env.PLAYER_SERVICE_REST_ADDR ?? "http://127.0.0.1:4001",
+        grpcAddr: process.env.PLAYER_SERVICE_GRPC_ADDR ?? "127.0.0.1:50051",
     },
 
     sfuService: {
-        restAddr: process.env.SFU_SERVICE_REST_ADDR ?? "http://localhost:5001",
+        restAddr: process.env.SFU_SERVICE_REST_ADDR ?? "http://127.0.0.1:5001",
     },
 
     jwt: {

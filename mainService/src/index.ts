@@ -20,6 +20,16 @@ const server = createServer(app);
 const playerService = new PlayerServiceClient();
 const playerManager = new PlayerManager();
 
+const createPrefixedProxy = (target: string, prefix: string) =>
+    createProxyMiddleware({
+        target,
+        changeOrigin: true,
+        pathRewrite: (path) => `${prefix}${path}`,
+        on: {
+            proxyReq: fixRequestBody,
+        },
+    });
+
 app.set('view engine', 'ejs');
 app.set('views', path.join(process.cwd(), 'pages'));
 
@@ -32,35 +42,17 @@ app.get("/", (req, res) => {
 
 app.use(
     "/user",
-    createProxyMiddleware({
-        target: `${config.playerService.restAddr}/user`,
-        changeOrigin: true,
-        on: {
-            proxyReq: fixRequestBody,
-        },
-    })
+    createPrefixedProxy(config.playerService.restAddr, "/user")
 );
 
 app.use(
     "/world",
-    createProxyMiddleware({
-        target: `${config.playerService.restAddr}/world`,
-        changeOrigin: true,
-        on: {
-            proxyReq: fixRequestBody,
-        },
-    })
+    createPrefixedProxy(config.playerService.restAddr, "/world")
 );
 
 app.use(
     '/sfu',
-    createProxyMiddleware({
-        target: `${config.sfuService.restAddr}/sfu`,
-        changeOrigin: true,
-        on: {
-            proxyReq: fixRequestBody,
-        },
-    })
+    createPrefixedProxy(config.sfuService.restAddr, "/sfu")
 )
 
 app.use(
