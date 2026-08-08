@@ -1,12 +1,10 @@
 import { Router } from "express";
-import PlayerManager from "../lib/playermanager";
 import SFUManager from "../lib/sfu";
 
 export default class SFURouter {
     private router: Router = Router();
 
     constructor(
-        private playerManager: PlayerManager,
         private sfuManager: SFUManager
     ) {
 

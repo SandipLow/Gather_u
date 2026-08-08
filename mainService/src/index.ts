@@ -22,7 +22,7 @@ const server = createServer(app);
 const playerService = new PlayerServiceClient();
 const playerManager = new PlayerManager();
 const sfuManager = new SFUManager(playerManager);
-const sfuRouter = new SFURouter(playerManager, sfuManager);
+const sfuRouter = new SFURouter(sfuManager);
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(process.cwd(), 'pages'));

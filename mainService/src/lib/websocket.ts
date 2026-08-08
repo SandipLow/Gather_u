@@ -4,8 +4,6 @@ import { v4 as uuidv4 } from "uuid";
 import PlayerService from "./playerService";
 import RedisPubSub from "./redis";
 import { verifyJWT } from "./auth";
-import { GameLoop } from "./gameloop";
-import { Consumer, Producer } from "mediasoup/types";
 import PlayerManager from "./playermanager";
 
 declare module "ws" {
@@ -33,7 +31,6 @@ export default class SocketServer {
     wss: WebSocketServer;
     redisPubSub: RedisPubSub;
 
-    private gameLoop: GameLoop;
     private heartbeatTimer: NodeJS.Timeout;
 
     constructor(
@@ -47,16 +44,6 @@ export default class SocketServer {
             this.serverid,
             (err) => console.error("Redis error:", err),
             this.onRedisMessage.bind(this)
-        );
-
-        // broadcast nearby players' positions after each tick
-        this.gameLoop = new GameLoop(
-            playerService,
-            (playerId, nearby, x, y, animation, timestamp) => {
-                nearby.forEach((id) =>
-                    this.sendMessage(id, WebSocketEvents.MOVE, { playerId, x, y, animation, timestamp })
-                );
-            }
         );
 
         this.wss = new WebSocketServer({ server });
@@ -73,7 +60,6 @@ export default class SocketServer {
         // stop game loop when WS server closes
         this.wss.on("close", () => {
             clearInterval(this.heartbeatTimer);
-            this.gameLoop.stop();
         });
     }
 
@@ -109,7 +95,8 @@ export default class SocketServer {
         ws.on("message", this.onMessage.bind(this, ws));
         ws.on("close", this.onClose.bind(this, ws));
 
-        this.playerService.enterPlayerWorld(playerId)
+        this.playerService
+            .enterPlayerWorld(playerId)
             .then((otherPlayers) => {
                 otherPlayers.forEach((id) => {
                     this.sendMessage(playerId, WebSocketEvents.ENTER, { playerId: id });
@@ -176,8 +163,14 @@ export default class SocketServer {
             return;
         }
 
-        // enqueue instead of direct gRPC call
-        this.gameLoop.enqueue(playerId, x, y, animation, timestamp);
+        this.playerService
+            .setPlayerCoordinates(playerId, x, y, animation, timestamp)
+            .then((nearbyPlayers) => {
+                nearbyPlayers.forEach((id) => {
+                    this.sendMessage(id, WebSocketEvents.MOVE, { playerId, x, y, animation, timestamp });
+                });
+            })
+            .catch((error) => console.error("Error setting coordinates:", error));
     }
 
     handleTalk(payload: any, ws: WebSocket) {
@@ -197,7 +190,6 @@ export default class SocketServer {
         if (!ws.playerId) return;
         
         this.playerManager.close(ws.playerId);
-        this.gameLoop.dequeue(ws.playerId);
 
         this.playerService.leavePlayerWorld(ws.playerId)
             .then((otherPlayers) => {

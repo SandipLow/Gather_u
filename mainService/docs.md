@@ -62,12 +62,40 @@ These endpoints manage user registration, authentication, and data.
 - **Endpoint**: `GET /user`
 - **Description**: Retrieves the authenticated user's data, including their players.
 - **Authentication**: Requires a valid JWT in the `Authorization` header.
+- **Response**:
+  ```json
+  {
+    "id": "string",
+    "name": "string",
+    "email": "string",
+    "players": [
+      {
+        "id": "string",
+        "user_id": "string",
+        "world_id": "string",
+        "name": "string",
+        "wealth": "number",
+        "spritesheet": "string",
+        "checkpoint": {
+          "x": "number",
+          "y": "number"
+        }
+      }
+    ]
+  }
+  ```
 
 ### Update User Data
 
 - **Endpoint**: `PUT /user`
 - **Description**: Updates the authenticated user's data.
 - **Authentication**: Requires a valid JWT in the `Authorization` header.
+- **Response**:
+  ```json
+  {
+    "message": "User updated successfully"
+  }
+  ```
 
 ---
 
@@ -87,7 +115,25 @@ These endpoints handle player creation and data retrieval.
     "world_id": "string",
     "spritesheet": "string",
     "wealth": "number",
-    "checkpoint": "string"
+    "checkpoint": {
+      "x": "number",
+      "y": "number"
+    }
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "id": "string",
+    "user_id": "string",
+    "world_id": "string",
+    "name": "string",
+    "wealth": "number",
+    "spritesheet": "string",
+    "checkpoint": {
+      "x": "number",
+      "y": "number"
+    }
   }
   ```
 
@@ -96,11 +142,30 @@ These endpoints handle player creation and data retrieval.
 - **Endpoint**: `GET /user/:playerId`
 - **Description**: Retrieves a player-specific JWT for connecting to the WebSocket and SFU services.
 - **Authentication**: Requires a valid JWT in the `Authorization` header.
+- **Response**:
+  ```json
+  {
+    "playerToken": "string"
+  }
+  ```
 
 ### Get Public Player Data
 
 - **Endpoint**: `GET /user/:playerId/public`
 - **Description**: Retrieves public information about a specific player.
+- **Response**:
+  ```json
+  {
+    "id": "string",
+    "name": "string",
+    "wealth": "number",
+    "spritesheet": "string",
+    "checkpoint": {
+      "x": "number",
+      "y": "number"
+    }
+  }
+  ```
 
 ---
 
@@ -119,12 +184,28 @@ These endpoints are for creating and searching for game worlds.
     "name": "string"
   }
   ```
+- **Response**:
+  ```json
+  {
+    "id": "string",
+    "name": "string"
+  }
+  ```
 
 ### Search for Worlds
 
 - **Endpoint**: `GET /world/search`
 - **Description**: Searches for worlds by name.
 - **Query Parameter**: `q` (the search term)
+- **Response**:
+  ```json
+  [
+    {
+      "id": "string",
+      "name": "string"
+    }
+  ]
+  ```
 
 ---
 
@@ -139,6 +220,14 @@ The WebSocket server handles real-time player interactions.
 
 ### WebSocket Events
 
+sample Format: 
+```json
+  {
+    "type": "string",
+    "payload": "Payload" 
+  }
+```
+
 #### Incoming Events
 
 - **`enter`**: A player has entered your area of interest.
@@ -146,20 +235,20 @@ The WebSocket server handles real-time player interactions.
 - **`leave`**: A player has left your area of interest.
   - **Payload**: `{ "playerId": "string" }`
 - **`move`**: A player has moved.
-  - **Payload**: `{ "playerId": "string", "x": number, "y": number, "animation": "string", "timestamp": number }`
+  - **Payload**: `{ "playerId": "string", "x": "number", "y": "number", "animation": "string", "timestamp": "number" }`
 - **`talk`**: You have received a message from another player.
   - **Payload**: `{ "from": "string", "message": "string" }`
 
 #### Outgoing Events
 
 - **`move`**: Broadcast your player's movement.
-  - **Payload**: `{ "x": number, "y": number, "animation": "string", "timestamp": number }`
+  - **Payload**: `{ "x": "number", "y": "number", "animation": "string", "timestamp": "number" }`
 - **`talk`**: Send a message to specific players.
   - **Payload**: `{ "players": ["playerId1", "playerId2"], "message": "string" }`
 
 ---
 
-## Media Streaming (SFU) [Experimental]
+## Media Streaming (SFU)
 
 The Selective Forwarding Unit (SFU) manages video and audio streaming between players.
 
@@ -167,11 +256,13 @@ The Selective Forwarding Unit (SFU) manages video and audio streaming between pl
 
 - **Endpoint**: `GET /sfu/capabilities`
 - **Description**: Retrieves the server's media streaming capabilities.
+- **Response**: Mediasoup router capabilities object.
 
 ### Create WebRTC Transport
 
 - **Endpoint**: `POST /sfu/transport/:playerId`
 - **Description**: Creates a WebRTC transport for a player.
+- **Response**: Transport information object.
 
 ### Connect WebRTC Transport
 
@@ -179,6 +270,12 @@ The Selective Forwarding Unit (SFU) manages video and audio streaming between pl
 - **Description**: Connects a transport for sending (`send`) or receiving (`recv`) media.
 - **URL Parameters**:
   - `direction`: `"send"` or `"recv"`
+- **Response**:
+  ```json
+  {
+    "status": "ok"
+  }
+  ```
 
 ### Start Producing a Stream
 
@@ -191,13 +288,21 @@ The Selective Forwarding Unit (SFU) manages video and audio streaming between pl
     "rtpParameters": { ... }
   }
   ```
+- **Response**: Producer information object.
 
 ### Receive a Stream
 
 - **Endpoint**: `POST /sfu/getstream/:consumerPlayerId/:targetPlayerId`
 - **Description**: Subscribes to another player's media stream.
+- **Response**: Consumer information object.
 
 ### Stop Receiving a Stream
 
 - **Endpoint**: `POST /sfu/removeStream/:consumerPlayerId/:targetPlayerId`
 - **Description**: Unsubscribes from another player's media stream.
+- **Response**:
+  ```json
+  {
+    "status": "ok"
+  }
+  ```
