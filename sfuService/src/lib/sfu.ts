@@ -1,16 +1,21 @@
-import { Router } from "mediasoup/types";
-import PlayerManager from "./playermanager";
+import {Consumer, Producer, Router, WebRtcTransport} from "mediasoup/types";
 import { createWorkerRouter } from "./worker";
 import config from "./config";
+
+type PlayerConnects = {
+    sendTransport?: WebRtcTransport;
+    recvTransport?: WebRtcTransport;
+    producers: Map<string, Producer>; // kind -> Producer
+    consumers: Map<string, Consumer>; // producerId -> Consumer
+}
 
 
 export default class SFUManager {
     private mediasoupRouter: Router | null = null;
+    private players: Map<string, PlayerConnects> = new Map();
+    
 
-    constructor(
-        private playerManager: PlayerManager
-    ) {
-
+    constructor() {
         createWorkerRouter()
             .then((router) => {
                 this.mediasoupRouter = router;
@@ -38,17 +43,15 @@ export default class SFUManager {
                 return;
             }
 
-            const player = this.playerManager.getPlayer(playerId);
-            if (!player) {
-                console.error(`Player with ID ${playerId} does not exist.`);
-                return;
-            }
-
             const sendTransport = await this.mediasoupRouter.createWebRtcTransport(config.mediasoup.transport);
             const recvTransport = await this.mediasoupRouter.createWebRtcTransport(config.mediasoup.transport);
 
-            player.sendTransport = sendTransport;
-            player.recvTransport = recvTransport;
+            this.players.set(playerId, {
+                sendTransport,
+                recvTransport,
+                producers: new Map(),
+                consumers: new Map()
+            });
 
             return {
                 sendTransport: {
@@ -71,7 +74,7 @@ export default class SFUManager {
 
     async connectTransport(playerId: string, direction: "send" | "recv", dtlsParameters: any) {
         try {
-            const player = this.playerManager.getPlayer(playerId);
+            const player = this.players.get(playerId);
             if (!player) {
                 console.error(`Player with ID ${playerId} does not exist.`);
                 return;
@@ -94,7 +97,7 @@ export default class SFUManager {
 
     async produce(playerId: string, kind: "audio" | "video", rtpParameters: any) {
         try {
-            const player = this.playerManager.getPlayer(playerId);
+            const player = this.players.get(playerId);
             if (!player) {
                 console.error(`Player with ID ${playerId} does not exist.`);
                 return;
@@ -122,8 +125,8 @@ export default class SFUManager {
         if (!this.mediasoupRouter)
             throw new Error("Router not initialized");
 
-        const consumerPlayer = this.playerManager.getPlayer(consumerPlayerId);
-        const targetPlayer = this.playerManager.getPlayer(targetPlayerId);
+        const consumerPlayer = this.players.get(consumerPlayerId);
+        const targetPlayer = this.players.get(targetPlayerId);
 
         if (!consumerPlayer)
             throw new Error("Consumer player not found");
@@ -174,7 +177,7 @@ export default class SFUManager {
         producerPlayerId: string
     ) {
 
-        const player = this.playerManager.getPlayer(consumerPlayerId);
+        const player = this.players.get(consumerPlayerId);
         if (!player) return;
 
         const consumer = player.consumers.get(producerPlayerId);
