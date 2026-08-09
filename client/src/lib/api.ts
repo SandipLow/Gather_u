@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export const fetchUserData = async (token: string) => {
     const res = await fetch(`${API_URL}/user/`, {
@@ -124,6 +124,22 @@ export const createPlayer = async (playerData: any, token: string) => {
     return res.json();
 }
 
+export const createGuestPlayer = async (name: string, spritesheet: string) => {
+    const res = await fetch(`${API_URL}/user/guest`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, spritesheet }),
+    });
+
+    if (!res.ok) {
+        throw new Error('Failed to create guest player');
+    }
+
+    return res.json();
+};
+
 export const getRouterCapabilities = async () => {
     const res = await fetch(`${API_URL}/sfu/capabilities`, {
         method: 'GET',
@@ -216,4 +232,3 @@ export const removeStream = async (consumerPlayerId: string, targetPlayerId: str
 
     return res.json();
 }
-

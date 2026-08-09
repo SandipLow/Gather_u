@@ -92,9 +92,9 @@ export default class WebSocketClient {
         };
     }
 
-    static async create(playerId: string) {
-        const token = await authState.getPlayerToken(playerId);
-        const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3000';
+    static async create(playerId: string, player_token? : string | undefined) {
+        const token = player_token || await authState.getPlayerToken(playerId);
+        const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
         const socket = new WebSocket(`${wsUrl}?token=${token}`);
         return new WebSocketClient(socket, token);
     }

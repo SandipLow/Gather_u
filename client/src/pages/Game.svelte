@@ -7,9 +7,11 @@
     import SFUClient from "../lib/sfu";
     import * as api from "../lib/api";
 
+    const TEST_SFU = import.meta.env.VITE_ENABLE_SFU || false;
     let game: Phaser.Game | null = null;
     let fullscreen = false;
     let playerData: any = null;
+    let playToken: any = null;
     let socket: WebSocketClient | null = null;
     let stream: MediaStream | null = null;
     let sfu: SFUClient | null = null;
@@ -75,7 +77,8 @@
             }
 
             playerData = history.state.playerData;
-            socket = await WebSocketClient.create(playerData.id);
+            playToken = history.state.token;
+            socket = await WebSocketClient.create(playerData.id, playToken);
 
             socket.onOpen = () => {
                 connectionStatus = "Connected";
@@ -106,39 +109,43 @@
                 latency = "--";
             };
 
-            stream = await navigator.mediaDevices.getUserMedia({
-                audio: true,
-                video: true,
-            });
+            if (TEST_SFU) {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: true,
+                });
 
-            sfu = new SFUClient(stream, playerData.id);
+                sfu = new SFUClient(stream, playerData.id);
 
-            sfu.onRemoteStreamAdded = (
-                playerId: string,
-                stream: MediaStream,
-            ) => {
-                api.getPlayerData(playerId)
-                    .then((playerData) => {
-                        remoteStreams.set(playerId, { ...playerData, stream });
-                    })
-                    .catch((error) => {
-                        console.error(
-                            `Failed to fetch player data for ${playerId}:`,
-                            error,
-                        );
+                sfu.onRemoteStreamAdded = (
+                    playerId: string,
+                    stream: MediaStream,
+                ) => {
+                    api.getPlayerData(playerId)
+                        .then((playerData) => {
+                            remoteStreams.set(playerId, { ...playerData, stream });
+                        })
+                        .catch((error) => {
+                            console.error(
+                                `Failed to fetch player data for ${playerId}:`,
+                                error,
+                            );
 
-                        remoteStreams.set(playerId, { id: "-1", name: "Unknown", wealth: 0, checkpoint: {x: -1, y: -1}, spritesheet: "", stream });
-                    })
-                    .finally(() => {
-                        remoteStreams = new Map(remoteStreams); // Trigger Svelte reactivity
-                    });
-            };
+                            remoteStreams.set(playerId, { id: "-1", name: "Unknown", wealth: 0, checkpoint: {x: -1, y: -1}, spritesheet: "", stream });
+                        })
+                        .finally(() => {
+                            remoteStreams = new Map(remoteStreams); // Trigger Svelte reactivity
+                        });
+                };
 
-            sfu.onRemoteStreamRemoved = (playerId: string) => {
-                remoteStreams.delete(playerId);
+                sfu.onRemoteStreamRemoved = (playerId: string) => {
+                    remoteStreams.delete(playerId);
 
-                remoteStreams = new Map(remoteStreams); // Trigger Svelte reactivity
-            };
+                    remoteStreams = new Map(remoteStreams); // Trigger Svelte reactivity
+                };
+            }
+
+
 
             game = new Phaser.Game({
                 type: Phaser.AUTO,

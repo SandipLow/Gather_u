@@ -4,7 +4,9 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import fetchUser from '../middlewares/fetchUser';
 import Player from '../models/Player';
+import World from '../models/World';
 import { cache } from '../lib/cache';
+import { tempPlayerManager } from '../lib/tempPlayerManager';
 
 const router = Router();
 
@@ -99,12 +101,22 @@ router.get("/:playerId/public", async (req, res) => {
         }
 
         const playerId = req.params.playerId;
-        const player = await Player.get(playerId);
+        let player: Player | undefined;
+
+        // guest player
+        if (playerId.startsWith('tmp_')) {
+            player = tempPlayerManager.getTemporaryPlayer(playerId);
+        }
+        // auth player
+        else {
+            player = await Player.get(playerId) || undefined;
+        }
 
         if (!player) {
             res.status(404).send("Player not found");
             return;
         }
+
 
         const payload = player.getPublicData();
         await cache.set(cacheKey, payload).catch(err => {
@@ -159,45 +171,26 @@ router.post("/", async (req, res) => {
 })
 
 
-// Create a new player for the authenticated user
-router.post("/player", fetchUser, async (req, res) => {
+// Create a temporary guest player
+router.post("/guest", async (req, res) => {
     try {
-        if (!req.user || !req.user.id) {
-            res.status(401).send("Unauthorized");
+        const { name, spritesheet } = req.body;
+        if (!name || !spritesheet) {
+            res.status(400).json({ error: "Missing required fields: name, spritesheet" });
             return;
         }
 
-        const user = await User.get(req.user.id);
-        if (!user) {
-            res.status(404).send("User not found");
-            return;
-        }
-
-        const { name, world_id, spritesheet, wealth, checkpoint } = req.body;
-        if (!name || !world_id || !spritesheet) {
-            res.status(400).send("Missing required fields");
-            return;
-        }
-
-        cache.delete(`user:${user.id}`).catch(err => {
-            console.error("Failed to delete cache for user data [ user:" + user.id + " ]:", err)
+        const { player, token } = tempPlayerManager.createTemporaryPlayer(name, spritesheet);
+        res.status(201).json({
+            player: player.getPublicData(),
+            token
         });
 
-        const newPlayer = await Player.create({
-            user_id: user.id,
-            world_id,
-            name,
-            spritesheet,
-            wealth,
-            checkpoint
-        });
-
-        res.status(201).json(newPlayer.exportData());
     } catch (error) {
-        console.error(error);
-        res.status(500).send("Internal server error");
+        console.error("Error creating guest player:", error);
+        res.status(500).json({ error: "Internal server error" });
     }
-})
+});
 
 
 // User login

@@ -103,9 +103,11 @@ This project is currently in active development. Core systems being implemented 
 - ✅ User authentication
 - ✅ Scaling
 - ✅ World persistence
-- ✅ Voice and Video chat
+- ✅ Voice and Video chat [Experimental]
 - 🔄 Map completion
 - ⏳ Chat system
+- ⏳ Play mini-games [Tic-tac-toe / Chess / badminton]
+- ⏳ Purchase properties
 
 ## 🚦 Getting Started
 

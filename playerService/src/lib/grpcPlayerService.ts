@@ -1,6 +1,7 @@
 import * as grpc from "@grpc/grpc-js";
 import Player from "../models/Player";
 import World from "../models/World";
+import { tempPlayerManager } from "./tempPlayerManager";
 
 const worlds:  Map<string, World>  = new Map();
 const players: Map<string, Player> = new Map();
@@ -28,6 +29,33 @@ const grpcPlayerService: grpc.UntypedServiceImplementation = {
     async EnterPlayerWorld({ request }: any, cb: grpc.sendUnaryData<any>) {
         try {
             const { playerId } = request;
+            const isGuest = playerId.startsWith('tmp_');
+
+            if (isGuest) {
+                const player = tempPlayerManager.getTemporaryPlayer(playerId);
+                if (!player) {
+                    cb({ code: grpc.status.NOT_FOUND, message: `Guest player ${playerId} not found.` });
+                    return;
+                }
+
+                players.set(playerId, player);
+
+                const world_id = player.world_id;
+                if (!worlds.has(world_id)) {
+                    worlds.set(world_id, new World({ id: world_id, name: "Open World" }));
+                }
+
+                const world = worlds.get(world_id)!;
+                world.addPlayer(player);
+
+                const otherPlayers = world.getOnlinePlayers()
+                    .filter(p => p.id !== playerId)
+                    .map(p => p.id);
+
+                cb(null, { playerIds: otherPlayers });
+                return;
+
+            }
 
             // Load player from DB if not already cached
             if (!players.has(playerId)) {
@@ -71,6 +99,7 @@ const grpcPlayerService: grpc.UntypedServiceImplementation = {
     LeavePlayerWorld({ request }: any, cb: grpc.sendUnaryData<any>) {
         try {
             const { playerId } = request;
+            const isGuest = playerId.startsWith('tmp_');
 
             const resolved = resolvePlayerAndWorld(playerId, cb);
             if (!resolved) return;
@@ -78,6 +107,10 @@ const grpcPlayerService: grpc.UntypedServiceImplementation = {
 
             world.removePlayer(player);
             players.delete(playerId);
+
+            if (isGuest) {
+                tempPlayerManager.removeTemporaryPlayer(playerId);
+            }
 
             const otherPlayers = world.getOnlinePlayers().map(p => p.id);
 

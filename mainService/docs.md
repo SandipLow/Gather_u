@@ -57,6 +57,34 @@ These endpoints manage user registration, authentication, and data.
   }
   ```
 
+### Guest Player (Instant Join)
+
+- **Endpoint**: `POST /user/guest`
+- **Description**: Creates a temporary guest player for instant access to the "Open World". No authentication is required.
+- **Request Body**:
+  ```json
+  {
+    "name": "string",
+    "spritesheet": "string"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "player": {
+      "id": "string (tmp_...)",
+      "name": "string",
+      "wealth": 0,
+      "spritesheet": "string",
+      "checkpoint": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    "token": "string"
+  }
+  ```
+
 ### Get User Data
 
 - **Endpoint**: `GET /user`
@@ -248,7 +276,7 @@ sample Format:
 
 ---
 
-## Media Streaming (SFU)
+## Media Streaming (SFU) [Experimental]
 
 The Selective Forwarding Unit (SFU) manages video and audio streaming between players.
 

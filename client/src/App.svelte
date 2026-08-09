@@ -5,6 +5,7 @@
     import CreatePlayer from "./pages/CreatePlayer.svelte";
     import AuthenticatedPage from "./components/AuthenticatedPage.svelte";
     import MainMenu from "./pages/MainMenu.svelte";
+    import Guest from "./pages/Guest.svelte";
 </script>
 
 <Router>
@@ -21,9 +22,11 @@
     </Route>
 
     <Route path="/game">
-        <AuthenticatedPage>
-            <Game />
-        </AuthenticatedPage>
+        <Game />
+    </Route>
+
+    <Route path="/guest">
+        <Guest />
     </Route>
 
     <Route path="/auth">

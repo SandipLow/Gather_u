@@ -168,6 +168,15 @@
                         : "Need an account? Register"}
                 </button>
 
+                <button
+                    type="button"
+                    on:click={() => {
+                        navigate('/guest');
+                    }}
+                >
+                    Join as Guest (No Login Required)
+                </button>
+
             </form>
 
         {/if}

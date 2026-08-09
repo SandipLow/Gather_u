@@ -32,7 +32,7 @@ export default class CityScene extends Phaser.Scene {
         super('CityScene');
     }
 
-    init({playerData, socket, sfu}: { playerData: PlayerData; socket: WebSocketClient, sfu: SFUClient }) {
+    init({playerData, socket, sfu}: { playerData: PlayerData; socket: WebSocketClient, sfu: SFUClient | null }) {
         this.playerData = playerData;
         this.socket = socket;
         this.sfu = sfu;
