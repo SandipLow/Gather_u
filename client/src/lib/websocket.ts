@@ -68,6 +68,10 @@ export default class WebSocketClient {
                 case WebSocketEvents.PONG:
                     this.onPong(Date.now() - payload.timestamp);
                     break;
+                case "error":
+                    console.error("WebSocket server error:", payload.message);
+                    this.onError(new Event("error"));
+                    break;
             }
         }
 

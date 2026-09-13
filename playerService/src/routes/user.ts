@@ -4,9 +4,8 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import fetchUser from '../middlewares/fetchUser';
 import Player from '../models/Player';
-import World from '../models/World';
 import { cache } from '../lib/cache';
-import { tempPlayerManager } from '../lib/tempPlayerManager';
+import playerManager from "../lib/PlayerManager";
 
 const router = Router();
 
@@ -105,7 +104,7 @@ router.get("/:playerId/public", async (req, res) => {
 
         // guest player
         if (playerId.startsWith('tmp_')) {
-            player = tempPlayerManager.getTemporaryPlayer(playerId);
+            player = playerManager.getPlayer(playerId);
         }
         // auth player
         else {
@@ -180,7 +179,7 @@ router.post("/guest", async (req, res) => {
             return;
         }
 
-        const { player, token } = tempPlayerManager.createTemporaryPlayer(name, spritesheet);
+        const { player, token } = playerManager.createTemporaryPlayer(name, spritesheet);
         res.status(201).json({
             player: player.getPublicData(),
             token
