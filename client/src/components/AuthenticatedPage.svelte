@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, type Snippet } from 'svelte';
-  import { authState } from '../lib/auth.svelte'; // Adjust the import path as needed
-    import { navigate } from 'svelte-routing';
+  import { authState } from '../lib/auth.svelte';
+  import { navigate } from 'svelte-routing';
 
   // Define properties using Svelte Runes
   let { children }: { children: Snippet } = $props();

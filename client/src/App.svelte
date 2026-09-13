@@ -6,27 +6,36 @@
     import AuthenticatedPage from "./components/AuthenticatedPage.svelte";
     import MainMenu from "./pages/MainMenu.svelte";
     import Guest from "./pages/Guest.svelte";
+    import LandscapePage from "./components/LandscapePage.svelte";
 </script>
 
 <Router>
     <Route path="/">
         <AuthenticatedPage>
-            <MainMenu />
+            <LandscapePage>
+                <MainMenu />
+            </LandscapePage>
         </AuthenticatedPage>
     </Route>
 
     <Route path="/create-player">
         <AuthenticatedPage>
-            <CreatePlayer />
+            <LandscapePage>
+                <CreatePlayer />
+            </LandscapePage>
         </AuthenticatedPage>
     </Route>
 
     <Route path="/game">
-        <Game />
+        <LandscapePage>
+            <Game />
+        </LandscapePage>
     </Route>
 
     <Route path="/guest">
-        <Guest />
+        <LandscapePage>
+            <Guest />
+        </LandscapePage>
     </Route>
 
     <Route path="/auth">
