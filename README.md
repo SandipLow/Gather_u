@@ -6,6 +6,17 @@ A real-time multiplayer RPG game built with modern web technologies, featuring c
 
 Gather_u is a browser-based multiplayer RPG where players can create characters, explore different worlds, and interact with other players in real-time. The game features a retro pixel art style with 16x16 character sprites and tile-based environments, and leverages WebRTC for voice and video communication.
 
+## 🚀 Features (In Development)
+
+- **Character System**: Multiple character classes with unique sprites
+- **World Exploration**: Tile-based maps with collision detection
+- **Real-time Multiplayer**: Live player movement and interactions
+- **User Management**: Player authentication and character persistence
+- **Voice and Video Chat**: Real-time communication powered by WebRTC and Mediasoup.
+- **Responsive UI**: Modal-based interface for game interactions
+
+---
+
 ## 🏗️ Architecture
 
 The current codebase is split into four runnable parts:
@@ -47,16 +58,6 @@ The current codebase is split into four runnable parts:
 - The main service talks to the player service over REST for user data and over gRPC for player/world operations.
 - The main service proxies all media-related requests to the SFU service.
 - Redis is used by the main service to forward gameplay events between running instances.
-
-
-## 🚀 Features (In Development)
-
-- **Character System**: Multiple character classes with unique sprites
-- **World Exploration**: Tile-based maps with collision detection
-- **Real-time Multiplayer**: Live player movement and interactions
-- **User Management**: Player authentication and character persistence
-- **Voice and Video Chat**: Real-time communication powered by WebRTC and Mediasoup.
-- **Responsive UI**: Modal-based interface for game interactions
 
 ## 🛠️ Tech Stack
 

@@ -1,18 +1,28 @@
 {
     "name": "gather_u",
-    "scripts": {
-        "dev": "cd playerService && yarn dev & cd mainService && yarn dev & cd client && yarn dev --host",
-        "dev:s2": "cd mainService && yarn dev:s2 & cd client && yarn dev:s2 --host",
-        "dev:s3": "cd mainService && yarn dev:s3 & cd client && yarn dev:s3 --host",
-        "build": "cd playerService && yarn build & cd mainService && yarn build & cd client && yarn build",
-        "start": "cd playerService && yarn start & cd mainService && yarn start & cd client && yarn preview --host",
-        "docker:build": "docker build -t gather_u-backend .",
-        "docker:run": "docker run --rm -p 3001:3001 -p 4001:4001 -p 50051:50051 -p 6379:6379 gather_u-backend"
-    },
     "version": "1.0.0",
     "main": "index.js",
     "author": "Sandip Low",
     "license": "MIT",
     "private": true,
+    "workspaces": [
+        "client",
+        "mainService",
+        "playerService",
+        "sfuService"
+    ],
+    "scripts": {
+        "dev:client:host": "turbo run dev:host --filter=client",
+        "dev": "turbo run dev",
+        "dev:s2": "turbo run dev:s2 --filter=main_service --filter=client",
+        "dev:s3": "turbo run dev:s3 --filter=main_service --filter=client",
+        "build": "turbo run build",
+        "start": "turbo run start",
+        "docker:build": "docker build -t gather_u-backend .",
+        "docker:run": "docker run --rm -p 3001:3001 -p 4001:4001 -p 50051:50051 -p 6379:6379 gather_u-backend"
+    },
+    "devDependencies": {
+        "turbo": "^2.4.4"
+    },
     "packageManager": "yarn@1.22.19+sha1.4ba7fc5c6e704fce2066ecbfb0b0d8976fe62447"
 }

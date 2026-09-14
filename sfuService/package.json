@@ -3,8 +3,6 @@
     "version": "1.0.0",
     "scripts": {
         "dev": "tsc-watch --onSuccess \"node dist/index.js\"",
-        "dev:s2": "PORT=5002 tsc-watch --onSuccess \"node dist/index.js\"",
-        "dev:s3": "PORT=5003 tsc-watch --onSuccess \"node dist/index.js\"",
         "build": "tsc -b",
         "start": "PORT=5001 node dist/index.js"
     },
