@@ -82,6 +82,19 @@
 
             {/each}
 
+            <div class="card">
+
+                <div>
+                    <h2>
+                        Open World
+                    </h2>
+                </div>
+
+                <button on:click={() => navigate('/guest')}>
+                    ENTER
+                </button>
+
+            </div>
 
             {#if players.length === 0}
                 <div class="message">

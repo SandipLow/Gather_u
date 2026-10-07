@@ -51,7 +51,7 @@
 
     function resizeGame() {
         setTimeout(() => {
-            game?.scale.setGameSize(window.innerWidth, window.innerHeight - 40);
+            game?.scale.resize(window.innerWidth, window.innerHeight - 40);
         }, 200);
     }
 
@@ -158,11 +158,13 @@
 
                 render: {
                     antialias: false,
+                    antialiasGL: false,
                     roundPixels: true,
+                    pixelArt: true,
                 },
 
                 scale: {
-                    mode: Phaser.Scale.FIT,
+                    mode: Phaser.Scale.RESIZE,
                     autoCenter: Phaser.Scale.CENTER_BOTH,
                 },
 

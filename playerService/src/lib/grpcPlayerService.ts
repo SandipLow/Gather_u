@@ -4,17 +4,33 @@ import playerManager from "./PlayerManager";
 
 const grpcPlayerService: grpc.UntypedServiceImplementation = {
 
-    EnterPlayerWorld({ request }: any, cb: grpc.sendUnaryData<any>) {
-        playerManager.EnterPlayerWorld(request, cb);
+    EnterPlayerWorldAndGetOthers({ request }: any, cb: grpc.sendUnaryData<any>) {
+        playerManager.EnterPlayerWorldAndGetOthers(request, cb);
     },
 
-    LeavePlayerWorld({ request }: any, cb: grpc.sendUnaryData<any>) {
-        playerManager.LeavePlayerWorld(request, cb);
+    LeavePlayerWorldAndGetOthers({ request }: any, cb: grpc.sendUnaryData<any>) {
+        playerManager.LeavePlayerWorldAndGetOthers(request, cb);
     },
 
-    SetPlayerCoordinates({ request }: any, cb: grpc.sendUnaryData<any>) {
-        playerManager.SetPlayerCoordinates(request, cb);
+    SetPlayerCoordinatesAndGetNears({ request }: any, cb: grpc.sendUnaryData<any>) {
+        playerManager.SetPlayerCoordinatesAndGetNears(request, cb);
     },
+
+    SetDrivingPlayerCoordinatesAndGetNears({ request }: any, cb: grpc.sendUnaryData<any>) {
+        playerManager.SetDrivingPlayerCoordinatesAndGetNears(request, cb);
+    },
+
+    GetAllOthersPlayersFromPlayerId({ request }: any, cb: grpc.sendUnaryData<any>) {
+        playerManager.GetAllOthersPlayersFromPlayerId(request, cb);
+    },
+
+    EnterCarAndGetOthers({ request }: any, cb: grpc.sendUnaryData<any>) {
+        playerManager.EnterCarAndGetOthers(request, cb);
+    },
+
+    LeaveCarAndGetOthers({ request }: any, cb: grpc.sendUnaryData<any>) {
+        playerManager.LeaveCarAndGetOthers(request, cb);
+    }
 };
 
 export default grpcPlayerService;

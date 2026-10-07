@@ -3,13 +3,60 @@ syntax = "proto3";
 package player;
 
 service PlayerService {
-  rpc EnterPlayerWorld    (EnterRequest)  returns (PlayerListResponse);
-  rpc LeavePlayerWorld    (LeaveRequest)  returns (PlayerListResponse);
-  rpc SetPlayerCoordinates (MoveRequest)  returns (PlayerListResponse);
+  rpc EnterPlayerWorldAndGetOthers        (EnterRequest)        returns (EnterWorldResponse);
+  rpc LeavePlayerWorldAndGetOthers        (LeaveRequest)        returns (PlayerListResponse);
+  rpc SetPlayerCoordinatesAndGetNears     (MoveRequest)         returns (PlayerListResponse);
+  rpc SetDrivingPlayerCoordinatesAndGetNears (MoveDrivingRequest) returns (PlayerListResponse);
+  rpc GetAllOthersPlayersFromPlayerId     (PlayerRequest)       returns (PlayerListResponse);
+  rpc EnterCarAndGetOthers                (CarRequest)          returns (PlayerListResponse);
+  rpc LeaveCarAndGetOthers                (CarRequest)          returns (PlayerListResponse);
 }
 
-message EnterRequest  { string playerId = 1; }
-message LeaveRequest  { string playerId = 1; }
-message MoveRequest   { string playerId = 1; float x = 2; float y = 3; string animation = 4; int64 timestamp = 5; }
+message EnterRequest        { string playerId = 1; }
+message LeaveRequest        { string playerId = 1; }
+message PlayerRequest       { string playerId = 1; }
+message MoveRequest         { string playerId = 1; float x = 2; float y = 3; string animation = 4; int64 timestamp = 5; }
+message MoveDrivingRequest  { string playerId = 1; string carId = 2; float x = 3; float y = 4; float angle = 5; int64 timestamp = 6; }
+message CarRequest          { string playerId = 1; string carId = 2; }
 
-message PlayerListResponse { repeated string playerIds = 1; }
+message Position {
+  float x = 1;
+  float y = 2;
+}
+
+message CarPosition {
+  float x = 1;
+  float y = 2;
+  float angle = 3;
+}
+
+message PlayerDataMsg {
+  string id = 1;
+  string name = 2;
+  string spritesheet = 3;
+  int32 wealth = 4;
+  Position checkpoint = 5;
+  Position position = 6;
+  string animation = 7;
+  int64 timestamp = 8;
+  string isDriving = 9;
+}
+
+message CarDataMsg {
+  string id = 1;
+  string spriteKey = 2;
+  CarPosition position = 3;
+  string isDriving = 4;
+  int64 timestamp = 5;
+}
+
+message EnterWorldResponse {
+  PlayerDataMsg self = 1;
+  repeated PlayerDataMsg players = 2;
+  repeated CarDataMsg cars = 3;
+}
+
+message PlayerListResponse { 
+  repeated string playerIds = 1; 
+  repeated string carIds = 2; 
+}

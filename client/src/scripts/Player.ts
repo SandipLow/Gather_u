@@ -13,7 +13,7 @@ abstract class BasePlayer extends Phaser.GameObjects.GameObject {
         super(scene, 'Player');
         this.scene = scene;
         this.playerData = playerData;
-        this.position = playerData.checkpoint;
+        this.position = (playerData as any).position ? { ...(playerData as any).position } : { ...playerData.checkpoint };
         this.animationPrefix = playerData.id + '-';
 
         this.createAnimations();
@@ -43,7 +43,7 @@ abstract class BasePlayer extends Phaser.GameObjects.GameObject {
             backgroundColor: '#000',
             padding: { x: 5, y: 2 },
             align: 'center',
-        })
+        });
 
         this.chatBubble.setOrigin(0.5);
         this.chatBubble.setDepth(1000);
@@ -72,8 +72,10 @@ abstract class BasePlayer extends Phaser.GameObjects.GameObject {
 export class Player extends BasePlayer {
     private sprite: Phaser.Physics.Arcade.Sprite;
     private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null;
-    private direction:string = 'down';
+    private wasd: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key } | null = null;
+    private direction: string = 'down';
     private animation: string | null = null;
+    isDriving = false
 
     constructor(
         scene: Phaser.Scene,
@@ -83,13 +85,24 @@ export class Player extends BasePlayer {
         super(scene, playerData);
         this.cursors = cursors;
 
+        if (scene.input.keyboard) {
+            this.wasd = scene.input.keyboard.addKeys({
+                W: Phaser.Input.Keyboard.KeyCodes.W,
+                A: Phaser.Input.Keyboard.KeyCodes.A,
+                S: Phaser.Input.Keyboard.KeyCodes.S,
+                D: Phaser.Input.Keyboard.KeyCodes.D
+            }) as any;
+        }
+
+        const startPos = (playerData as any).position || playerData.checkpoint;
         this.sprite = scene.physics.add.sprite(
-            playerData.checkpoint.x,
-            playerData.checkpoint.y,
+            startPos.x,
+            startPos.y,
             playerData.spritesheet.split('_')[0],
         );
         this.sprite.body?.setSize(10, 16);
         this.sprite.body?.setOffset(3, 0);
+        this.sprite.setDepth(2);
 
         scene.add.existing(this);
     }
@@ -98,20 +111,25 @@ export class Player extends BasePlayer {
         super.update();
         this.sprite.setVelocity(0);
 
-        if (this.cursors) {
-            if (this.cursors.left.isDown) {
+        const left = (this.cursors?.left.isDown || this.wasd?.A.isDown) ?? false;
+        const right = (this.cursors?.right.isDown || this.wasd?.D.isDown) ?? false;
+        const up = (this.cursors?.up.isDown || this.wasd?.W.isDown) ?? false;
+        const down = (this.cursors?.down.isDown || this.wasd?.S.isDown) ?? false;
+
+        if (!this.isDriving) {
+            if (left) {
                 this.sprite.setVelocityX(-100);
                 this.#playAnim('walk-left');
                 this.direction = 'left';
-            } else if (this.cursors.right.isDown) {
+            } else if (right) {
                 this.sprite.setVelocityX(100);
                 this.#playAnim('walk-right');
                 this.direction = 'right';
-            } else if (this.cursors.up.isDown) {
+            } else if (up) {
                 this.sprite.setVelocityY(-100);
                 this.#playAnim('walk-up');
                 this.direction = 'up';
-            } else if (this.cursors.down.isDown) {
+            } else if (down) {
                 this.sprite.setVelocityY(100);
                 this.#playAnim('walk-down');
                 this.direction = 'down';
@@ -140,10 +158,20 @@ export class Player extends BasePlayer {
 
 export class OtherPlayer extends BasePlayer {
     private sprite?: Phaser.Physics.Arcade.Sprite;
+    public isDriving: boolean = false;
 
-    constructor(scene: Phaser.Scene, playerData: PlayerData) {
+    constructor(scene: Phaser.Scene, playerData: any) {
         super(scene, playerData);
+        if (playerData.position) {
+            this.position = { x: playerData.position.x, y: playerData.position.y };
+        }
+        if (playerData.isDriving) {
+            this.isDriving = true;
+        }
         this.#load();
+        if (playerData.animation && this.sprite && !this.isDriving) {
+            this.sprite.anims?.play(this.animationPrefix + playerData.animation, true);
+        }
         scene.add.existing(this);
     }
 
@@ -159,6 +187,14 @@ export class OtherPlayer extends BasePlayer {
         this.sprite.x = x;
         this.sprite.y = y;
 
+        if (this.isDriving) {
+            this.sprite.setVisible(false);
+            this.sprite.anims?.stop();
+            return;
+        }
+
+        this.sprite.setVisible(true);
+
         if (animation) {
             this.sprite.anims?.play(this.animationPrefix + animation, true);
         } else {
@@ -166,13 +202,28 @@ export class OtherPlayer extends BasePlayer {
         }
     }
 
-    checkProximity(player: Player): boolean {
+    checkProximity(target: Player | { x: number; y: number } | number, targetY?: number): boolean {
+        let tx = 0;
+        let ty = 0;
+
+        if (typeof target === 'number') {
+            tx = target;
+            ty = targetY ?? 0;
+        } else if ('getSprite' in target) {
+            const spr = (target as Player).getSprite();
+            tx = spr ? spr.x : (target as Player).getPosition().x;
+            ty = spr ? spr.y : (target as Player).getPosition().y;
+        } else if ('x' in target && 'y' in target) {
+            tx = target.x;
+            ty = target.y;
+        }
+
         const distance = Phaser.Math.Distance.Between(
             this.position.x, this.position.y,
-            player.getSprite().x, player.getSprite().y,
+            tx, ty,
         );
 
-        if (distance < 240) {
+        if (distance < 500) {
             this.#load();
         } else {
             this.#unload();
@@ -195,6 +246,25 @@ export class OtherPlayer extends BasePlayer {
             this.position.y,
             this.playerData.spritesheet.split('_')[0],
         );
+        this.sprite.body?.setSize(10, 16);
+        this.sprite.body?.setOffset(3, 0);
+        this.sprite.setDepth(2);
+
+        if (this.isDriving) {
+            this.sprite.setVisible(false);
+        }
+
+        // Re-attach colliders for loaded sprite
+        const cityScene = this.scene as any;
+        if (cityScene.housesLayer) this.scene.physics.add.collider(this.sprite, cityScene.housesLayer);
+        if (cityScene.treesLayer) this.scene.physics.add.collider(this.sprite, cityScene.treesLayer);
+        if (cityScene.player?.getSprite()) this.scene.physics.add.collider(cityScene.player.getSprite(), this.sprite);
+        if (cityScene.cars) {
+            for (const car of cityScene.cars.values()) {
+                const carSprite = car.getSprite();
+                if (carSprite) this.scene.physics.add.collider(this.sprite, carSprite);
+            }
+        }
     }
 
     #unload() {

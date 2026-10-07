@@ -32,3 +32,51 @@ export const sprites: { [key: string]: string } = {
     "DEVOUT": "assets/characters/sprites/old-style/05-devout.png",
     "CONJURER": "assets/characters/sprites/old-style/06-conjurer.png",
 }
+
+export const cars: { [key: string]: { [key: string]: string } } = {
+    "SUV": {
+        "Red": "assets/cars/SUV/Red.png",
+        "Blue": "assets/cars/SUV/Blue.png",
+        "Green": "assets/cars/SUV/Green.png",
+        "Yellow": "assets/cars/SUV/Yellow.png",
+        "White": "assets/cars/SUV/White.png",
+        "Black": "assets/cars/SUV/Black.png",
+        "Magenta": "assets/cars/SUV/Magenta.png",
+    },
+    "Musclecar": {
+        "Red": "assets/cars/Musclecar/Red.png",
+        "Blue": "assets/cars/Musclecar/Blue.png",
+        "Green": "assets/cars/Musclecar/Green.png",
+        "Yellow": "assets/cars/Musclecar/Green.png",
+        "White": "assets/cars/Musclecar/Green.png",
+        "Black": "assets/cars/Musclecar/Green.png",
+        "Magenta": "assets/cars/Musclecar/Green.png",
+    },
+    "Sedan": {
+        "Red": "assets/cars/Sedan/Red.png",
+        "Blue": "assets/cars/Sedan/Blue.png",
+        "Green": "assets/cars/Sedan/Green.png",
+        "Yellow": "assets/cars/Sedan/Green.png",
+        "White": "assets/cars/Sedan/Green.png",
+        "Black": "assets/cars/Sedan/Green.png",
+        "Magenta": "assets/cars/Sedan/Green.png",
+    },
+    "Sport": {
+        "Red": "assets/cars/Sport/Red.png",
+        "Blue": "assets/cars/Sport/Blue.png",
+        "Green": "assets/cars/Sport/Green.png",
+        "Yellow": "assets/cars/Sport/Green.png",
+        "White": "assets/cars/Sport/Green.png",
+        "Black": "assets/cars/Sport/Green.png",
+        "Magenta": "assets/cars/Sport/Green.png",
+    },
+    "Super": {
+        "Red": "assets/cars/Super/Red.png",
+        "Blue": "assets/cars/Super/Blue.png",
+        "Green": "assets/cars/Super/Green.png",
+        "Yellow": "assets/cars/Super/Yellow.png",
+        "White": "assets/cars/Super/White.png",
+        "Black": "assets/cars/Super/Black.png",
+        "Magenta": "assets/cars/Super/Magenta.png",
+    },
+}

@@ -56,7 +56,7 @@ class PlayerManager {
             return;
         }
 
-        
+
         const world = this.worlds.get(player.world_id) || await World.get(player.world_id);
         if (!world) {
             console.warn(`World with ID ${player.world_id} not found for player ${playerId}.`);
@@ -68,10 +68,14 @@ class PlayerManager {
         this.worlds.set(world.id, world);
         this.players.set(playerId, player);
         
-        return {player, world};
+        return { player, world };
     }
 
-    updatePlayerPosition(playerId: string, position: { x: any; y: any; }, animation: any, timestamp: any): boolean {
+    updatePlayerPosition(
+        playerId: string,
+        position: { x: number; y: number; },
+        animation: string, timestamp: number
+    ): boolean {
         const player = this.players.get(playerId);
         if (!player) {
             console.warn(`Player with ID ${playerId} not found in memory.`);
@@ -86,6 +90,27 @@ class PlayerManager {
 
         world.move(player, position.x, position.y, animation, timestamp);
         return true;
+    }
+
+    updateDrivingPlayerPosition(
+        playerId: string,
+        carId: string,
+        position: {x: number, y: number, angle: number},
+        timestamp: number
+    ): boolean {
+        const player = this.players.get(playerId);
+        if (!player) {
+            console.warn(`Player with ID ${playerId} not found in memory.`);
+            return false;
+        }
+
+        const world = this.worlds.get(player.world_id);
+        if (!world) {
+            console.warn(`World with ID ${player.world_id} not found for player ${playerId}.`);
+            return false;
+        }
+
+        return world.moveCar(playerId, carId, position.x, position.y, position.angle, timestamp)
     }
 
     removePlayer(playerId: string): void {
@@ -103,7 +128,10 @@ class PlayerManager {
         }
     }
 
-    getNearbyPlayers(playerId: string, radius: number = 100): Player[] | undefined {
+    getNearby(
+        playerId: string,
+        radius: number = 800
+    ) {
         const player = this.players.get(playerId);
         if (!player) {
             console.warn(`Player with ID ${playerId} not found in memory.`);
@@ -116,14 +144,18 @@ class PlayerManager {
             return;
         }
 
-        return world.getNearbyPlayers(player, radius);
+        const { x, y } = player.position;
+
+        const { players, cars } = world.getNearby(x, y, radius, new Set<string>().add(player.id));
+
+        return {players, cars};
     }
 
     #cleanupInactivePlayers() {
         const now = Date.now();
         for (const [playerId, player] of this.players.entries()) {
             if (now - player.timestamp > INACTIVITY_THRESHOLD_MS) {
-                this.players.delete(playerId);
+                this.removePlayer(playerId);
                 console.log(`Player ${playerId} removed from memory due to inactivity.`);
             }
         }
@@ -138,7 +170,7 @@ class PlayerManager {
     }
 
     // gRPC service functions
-    async EnterPlayerWorld(request: any, cb: grpc.sendUnaryData<any>) {
+    async EnterPlayerWorldAndGetOthers(request: any, cb: grpc.sendUnaryData<any>) {
         try {
             const { playerId } = request;
             
@@ -148,12 +180,44 @@ class PlayerManager {
                 return;
             }
 
-            const { world } = res;
-            const playerIds = world.getOnlinePlayers()
-                .filter(p => p.id !== playerId)
-                .map(p => p.id);
+            const { player, world } = res;
+            const onlinePlayers = world.getOnlinePlayers();
+            const cars = world.getCars();
 
-            cb(null, { playerIds });
+            const playerDrivingMap = new Map<string, string>();
+            for (const car of cars) {
+                if (car.isDriving) {
+                    playerDrivingMap.set(car.isDriving, car.id);
+                }
+            }
+
+            const mapPlayer = (p: Player) => ({
+                id: p.id,
+                name: p.name,
+                spritesheet: p.spritesheet,
+                wealth: p.wealth,
+                checkpoint: { x: p.checkpoint.x, y: p.checkpoint.y },
+                position: { x: p.position.x, y: p.position.y },
+                animation: p.animation || "idle",
+                timestamp: p.timestamp || Date.now(),
+                isDriving: playerDrivingMap.get(p.id) || ""
+            });
+
+            const mapCar = (c: any) => ({
+                id: c.id,
+                spriteKey: c.spriteKey,
+                position: { x: c.position.x, y: c.position.y, angle: c.position.angle ?? 180 },
+                isDriving: c.isDriving || "",
+                timestamp: c.timestamp || Date.now()
+            });
+
+            const response = {
+                self: mapPlayer(player),
+                players: onlinePlayers.filter(p => p.id !== playerId).map(mapPlayer),
+                cars: cars.map(mapCar)
+            };
+
+            cb(null, response);
 
         } catch (err) {
             console.error("EnterPlayerWorld error:", err);
@@ -161,7 +225,7 @@ class PlayerManager {
         }
     }
 
-    LeavePlayerWorld(request: any, cb: grpc.sendUnaryData<any>) {
+    LeavePlayerWorldAndGetOthers(request: any, cb: grpc.sendUnaryData<any>) {
         try {
             const { playerId } = request;
 
@@ -189,30 +253,164 @@ class PlayerManager {
         }
     }
 
-    SetPlayerCoordinates(request: any, cb: grpc.sendUnaryData<any>) {
+    SetPlayerCoordinatesAndGetNears(request: any, cb: grpc.sendUnaryData<any>) {
         try {
             const { playerId, x, y, animation, timestamp } = request;
 
-            // 1 FPS data only to save
-            if (Date.now() - timestamp >= 1000) {
-                const success = this.updatePlayerPosition(playerId, { x, y }, animation, timestamp);
-                if (!success) {
-                    cb({ code: grpc.status.NOT_FOUND, message: "Player not found." });
-                    return;
-                }
-            }
-
-            const nbrs = this.getNearbyPlayers(playerId, 800);
-            if (!nbrs) {
+            const player = this.players.get(playerId);
+            if (!player) {
                 cb({ code: grpc.status.NOT_FOUND, message: "Player not found." });
                 return;
             }
 
-            const playerIds = nbrs.map(p => p.id);
-            cb(null, { playerIds });
+            // 1 FPS data save
+            if (Date.now() - (player.timestamp || 0) >= 1000) {
+                this.updatePlayerPosition(playerId, { x, y }, animation, timestamp);
+            }
+
+            const nears = this.getNearby(playerId, 800);
+            if (!nears) {
+                cb({ code: grpc.status.NOT_FOUND, message: "Player not found." });
+                return;
+            }
+
+            const playerIds = nears.players.map(p => p.id);
+            const carIds = nears.cars.map(c => c.id);
+            cb(null, { playerIds, carIds });
 
         } catch (err) {
             console.error("SetPlayerCoordinates error:", err);
+            cb({ code: grpc.status.INTERNAL, message: "Internal server error." });
+        }
+    }
+
+    SetDrivingPlayerCoordinatesAndGetNears(req: any, cb: grpc.sendUnaryData<any>) {
+        try {
+            const { playerId, carId, x, y, angle, timestamp } = req;
+
+            const player = this.players.get(playerId);
+            if (!player) {
+                cb({ code: grpc.status.NOT_FOUND, message: "Player not found." });
+                return;
+            }
+
+            const world = this.worlds.get(player.world_id);
+            const car = world?.getCar(carId);
+
+            // 1 FPS data save
+            if (!car || Date.now() - (car.timestamp || 0) >= 1000) {
+                this.updateDrivingPlayerPosition(playerId, carId, { x, y, angle }, timestamp);
+            }
+
+            const nears = this.getNearby(playerId, 800);
+            if (!nears) {
+                cb({ code: grpc.status.NOT_FOUND, message: "Player not found." });
+                return;
+            }
+
+            const playerIds = nears.players.map(p => p.id);
+            const carIds = nears.cars.map(c => c.id);
+            cb(null, { playerIds, carIds });
+
+        } catch (e) {
+            console.error("SetDrivingPlayerCoordinatesAndGetNears error:", e);
+            cb({ code: grpc.status.INTERNAL, message: "Internal server error." });
+        }
+    }
+
+    GetAllOthersPlayersFromPlayerId(request: any, cb: grpc.sendUnaryData<any>) {
+        try {
+            const { playerId } = request;
+
+            const player = this.players.get(playerId);
+            if (!player) {
+                console.warn(`Player with ID ${playerId} not found in memory.`);
+                cb({ code: grpc.status.NOT_FOUND, message: "Player not found." });
+                return;
+            }
+
+            const world = this.worlds.get(player.world_id);
+            const playerIds = world
+                ? world.getOnlinePlayers()
+                    .filter(p => p.id !== playerId)
+                    .map(p => p.id)
+                : [];
+
+            cb(null, { playerIds });
+        } catch (err) {
+            console.error("GetAllOthersPlayersFromPlayerId error:", err);
+            cb({ code: grpc.status.INTERNAL, message: "Internal server error." });
+        }
+    }
+
+    EnterCarAndGetOthers(req: any, cb: grpc.sendUnaryData<any>) {
+        try {
+            const { playerId, carId } = req;
+
+            const player = this.players.get(playerId);
+            if (!player) {
+                console.warn(`Player with ID ${playerId} not found in memory.`);
+                cb({ code: grpc.status.NOT_FOUND, message: "Player not found." });
+                return;
+            }
+
+            const world = this.worlds.get(player.world_id);
+
+            const success = world?.enterCar(playerId, carId);
+            if (!success) {
+                cb({
+                    code: grpc.status.ALREADY_EXISTS,
+                    message: "Vehicle Already Owned"
+                })
+                return;
+            }
+
+            const playerIds = world
+                ? world.getOnlinePlayers()
+                    .filter(p => p.id !== playerId)
+                    .map(p => p.id)
+                : [];
+
+            cb(null, { playerIds });
+
+        } catch (e) {
+            console.error("EnterCarAndGetOthers error:", e);
+            cb({ code: grpc.status.INTERNAL, message: "Internal server error." });
+        }
+    }
+
+    LeaveCarAndGetOthers(req: any, cb: grpc.sendUnaryData<any>) {
+        try {
+            const { playerId, carId } = req;
+
+            const player = this.players.get(playerId);
+            if (!player) {
+                console.warn(`Player with ID ${playerId} not found in memory.`);
+                cb({ code: grpc.status.NOT_FOUND, message: "Player not found." });
+                return;
+            }
+
+            const world = this.worlds.get(player.world_id);
+
+            const success = world?.leaveCar(playerId, carId);
+            if (!success) {
+                cb({
+                    code: grpc.status.ALREADY_EXISTS,
+                    message: "Vehicle Already Owned"
+                })
+                return;
+            }
+
+            const playerIds = world
+                ? world.getOnlinePlayers()
+                    .filter(p => p.id !== playerId)
+                    .map(p => p.id)
+                : [];
+
+            cb(null, { playerIds });
+
+        } catch (e) {
+            console.error("LeaveCarAndGetOthers error:", e);
             cb({ code: grpc.status.INTERNAL, message: "Internal server error." });
         }
     }

@@ -14,10 +14,14 @@ declare module "ws" {
 }
 
 enum WebSocketEvents {
+    INIT = "init",
     ENTER = "enter",
     LEAVE = "leave",
     MOVE = "move",
     TALK = "talk",
+    ENTER_CAR = "enter_car",
+    LEAVE_CAR = "leave_car",
+    MOVE_CAR = "move_car",
 
     PING = "ping",
     PONG = "pong",
@@ -96,11 +100,16 @@ export default class SocketServer {
         ws.on("close", this.onClose.bind(this, ws));
 
         this.playerService
-            .enterPlayerWorld(playerId)
-            .then((otherPlayers) => {
-                otherPlayers.forEach((id) => {
-                    this.sendMessage(playerId, WebSocketEvents.ENTER, { playerId: id });
-                    this.sendMessage(id, WebSocketEvents.ENTER, { playerId });
+            .enterPlayerWorldAndGetOthers(playerId)
+            .then((enterData) => {
+                // Send full initial world state to the newly connected player
+                this.sendMessage(playerId, WebSocketEvents.INIT, enterData);
+
+                // Broadcast ENTER to other players with the actual player data
+                enterData.players.forEach((otherPlayer) => {
+                    this.sendMessage(otherPlayer.id, WebSocketEvents.ENTER, {
+                        player: enterData.self
+                    });
                 });
             })
             .catch((error) => {
@@ -118,6 +127,9 @@ export default class SocketServer {
             switch (type) {
                 case WebSocketEvents.MOVE: this.handleMove(payload, ws); break;
                 case WebSocketEvents.TALK: this.handleTalk(payload, ws); break;
+                case WebSocketEvents.ENTER_CAR: this.handleEnterCar(payload, ws); break;
+                case WebSocketEvents.LEAVE_CAR: this.handleLeaveCar(payload, ws); break;
+                case WebSocketEvents.MOVE_CAR: this.handleMoveCar(payload, ws); break;
 
                 case WebSocketEvents.PING: {
                     if (ws.playerId) {
@@ -164,7 +176,7 @@ export default class SocketServer {
         }
 
         this.playerService
-            .setPlayerCoordinates(playerId, x, y, animation, timestamp)
+            .setPlayerCoordinatesAndGetNears(playerId, x, y, animation, timestamp)
             .then((nearbyPlayers) => {
                 nearbyPlayers.forEach((id) => {
                     this.sendMessage(id, WebSocketEvents.MOVE, { playerId, x, y, animation, timestamp });
@@ -186,12 +198,81 @@ export default class SocketServer {
         }
     }
 
+    handleEnterCar(payload: any, ws: WebSocket) {
+        const playerId = ws.playerId;
+        if (!playerId) return;
+
+        const { carId } = payload;
+        if (!carId) return;
+
+        this.playerService
+            .enterCarAndGetOthers(playerId, carId)
+            .then((players) => {
+                // Send confirmation back to requesting client by reusing ENTER_CAR event
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: WebSocketEvents.ENTER_CAR, payload: { playerId, carId } }));
+                }
+                // Broadcast ENTER_CAR to other players
+                players.forEach((targetId) => {
+                    this.sendMessage(targetId, WebSocketEvents.ENTER_CAR, { playerId, carId });
+                });
+            })
+            .catch((error) => {
+                console.error("Error handling enter car:", error);
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "error", payload: { message: error.message || "Vehicle Already Owned" } }));
+                }
+            });
+    }
+
+    handleLeaveCar(payload: any, ws: WebSocket) {
+        const playerId = ws.playerId;
+        if (!playerId) return;
+
+        const { carId } = payload;
+        if (!carId) return;
+
+        this.playerService
+            .leaveCarAndGetOthers(playerId, carId)
+            .then((players) => {
+                players.forEach((targetId) => {
+                    this.sendMessage(targetId, WebSocketEvents.LEAVE_CAR, { playerId, carId });
+                });
+            })
+            .catch((error) => console.error("Error handling leave car:", error));
+    }
+
+    handleMoveCar(payload: any, ws: WebSocket) {
+        const playerId = ws.playerId;
+        if (!playerId) return;
+
+        const { carId, x, y, angle } = payload;
+        if (!carId
+            || typeof x !== "number"
+            || typeof y !== "number"
+            || typeof angle !== "number"
+            || !isFinite(x)
+            || !isFinite(y)
+            || !isFinite(angle)
+        ) return;
+
+        const timestamp = Date.now();
+        this.playerService
+            .setDrivingPlayerCoordinatesAndGetNears(playerId, carId, x, y, angle, timestamp)
+            .then((players) => {
+                players.forEach((targetId) => {
+                    this.sendMessage(targetId, WebSocketEvents.MOVE_CAR, { playerId, carId, x, y, angle });
+                });
+            })
+            .catch((error) => console.error("Error handling move car:", error));
+    }
+
     onClose(ws: WebSocket) {
         if (!ws.playerId) return;
         
         this.playerManager.close(ws.playerId);
 
-        this.playerService.leavePlayerWorld(ws.playerId)
+        this.playerService.leavePlayerWorldAndGetOthers(ws.playerId)
             .then((otherPlayers) => {
                 otherPlayers.forEach((id) =>
                     this.sendMessage(id, WebSocketEvents.LEAVE, { playerId: ws.playerId })

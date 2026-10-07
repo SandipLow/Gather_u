@@ -1,7 +1,7 @@
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import path from "path";
-import PlayerService from "./playerService";
+import PlayerService, { EnterWorldResponse } from "./playerService";
 import config from "./config";
 
 const PROTO_PATH = path.join(__dirname, "../../proto/player.proto");
@@ -39,18 +39,38 @@ function call<T>(method: string, payload: object): Promise<T> {
 
 export default class PlayerServiceClient implements PlayerService {
 
-    async enterPlayerWorld(playerId: string): Promise<string[]> {
-        const res = await call<{ playerIds: string[] }>("EnterPlayerWorld", { playerId });
+    async enterPlayerWorldAndGetOthers(playerId: string): Promise<EnterWorldResponse> {
+        const res = await call<EnterWorldResponse>("EnterPlayerWorldAndGetOthers", { playerId });
+        return res;
+    }
+
+    async leavePlayerWorldAndGetOthers(playerId: string): Promise<string[]> {
+        const res = await call<{ playerIds: string[] }>("LeavePlayerWorldAndGetOthers", { playerId });
         return res.playerIds;
     }
 
-    async leavePlayerWorld(playerId: string): Promise<string[]> {
-        const res = await call<{ playerIds: string[] }>("LeavePlayerWorld", { playerId });
+    async setPlayerCoordinatesAndGetNears(playerId: string, x: number, y: number, animation: string, timestamp: number): Promise<string[]> {
+        const res = await call<{ playerIds: string[] }>("SetPlayerCoordinatesAndGetNears", { playerId, x, y, animation, timestamp });
         return res.playerIds;
     }
 
-    async setPlayerCoordinates(playerId: string, x: number, y: number): Promise<string[]> {
-        const res = await call<{ playerIds: string[] }>("SetPlayerCoordinates", { playerId, x, y });
+    async setDrivingPlayerCoordinatesAndGetNears(playerId: string, carId: string, x: number, y: number, angle: number, timestamp: number): Promise<string[]> {
+        const res = await call<{ playerIds: string[] }>("SetDrivingPlayerCoordinatesAndGetNears", { playerId, carId, x, y, angle, timestamp });
+        return res.playerIds;
+    }
+
+    async getAllOthersPlayersFromPlayerId(playerId: string): Promise<string[]> {
+        const res = await call<{ playerIds: string[] }>("GetAllOthersPlayersFromPlayerId", { playerId });
+        return res.playerIds;
+    }
+
+    async enterCarAndGetOthers(playerId: string, carId: string): Promise<string[]> {
+        const res = await call<{ playerIds: string[] }>("EnterCarAndGetOthers", { playerId, carId });
+        return res.playerIds;
+    }
+
+    async leaveCarAndGetOthers(playerId: string, carId: string): Promise<string[]> {
+        const res = await call<{ playerIds: string[] }>("LeaveCarAndGetOthers", { playerId, carId });
         return res.playerIds;
     }
 }

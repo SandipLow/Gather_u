@@ -2,10 +2,14 @@ import { authState } from "./auth.svelte";
 
 enum WebSocketEvents {
     // World events
+    INIT = "init",
     ENTER = "enter",
     LEAVE = "leave",
     MOVE = "move",
     TALK = "talk",
+    ENTER_CAR = "enter_car",
+    LEAVE_CAR = "leave_car",
+    MOVE_CAR = "move_car",
 
     // Utility events
     PING = "ping",
@@ -22,11 +26,28 @@ const LATENCY_CHECK_INTERVAL = 5000;
 export default class WebSocketClient {
     private isClosedManually: boolean = false;
     private pingInterval: ReturnType<typeof setInterval> | null = null;
+    private _initialState: any = null;
+    private _onInit: (data: { self?: any; players?: any[]; cars?: any[] }) => void = () => { };
 
-    onEnter: (playerId: string) => void = () => { };
+    get onInit() {
+        return this._onInit;
+    }
+
+    set onInit(handler: (data: { self?: any; players?: any[]; cars?: any[] }) => void) {
+        this._onInit = handler;
+        if (this._initialState) {
+            handler(this._initialState);
+        }
+    }
+
+    onEnter: (playerData: any) => void = () => { };
     onLeave: (playerId: string) => void = () => { };
     onMove: (playerId: string, x: number, y: number, animation: string, timestamp: number) => void = () => { };
     onTalk: (playerId: string, message: string) => void = () => { };
+    onEnterCar: (carId: string, playerId: string) => void = () => { };
+    onLeaveCar: (carId: string) => void = () => { };
+    onMoveCar: (playerId: string, carId: string, x: number, y: number, angle: number) => void = () => { };
+    onWsError: (message: string) => void = () => { };
 
     onOpen: () => void = () => { };
     onReconnect: () => void = () => { };
@@ -53,14 +74,27 @@ export default class WebSocketClient {
         this.socket.onmessage = (e) => {
             const { type, payload } = JSON.parse(e.data);
             switch (type) {
+                case WebSocketEvents.INIT:
+                    this._initialState = payload;
+                    this._onInit(payload);
+                    break;
                 case WebSocketEvents.ENTER:
-                    this.onEnter(payload.playerId);
+                    this.onEnter(payload.player || payload);
                     break;
                 case WebSocketEvents.LEAVE:
                     this.onLeave(payload.playerId);
                     break;
                 case WebSocketEvents.MOVE:
                     this.onMove(payload.playerId, payload.x, payload.y, payload.animation, payload.timestamp);
+                    break;
+                case WebSocketEvents.ENTER_CAR:
+                    this.onEnterCar(payload.carId, payload.playerId);
+                    break;
+                case WebSocketEvents.LEAVE_CAR:
+                    this.onLeaveCar(payload.carId);
+                    break;
+                case WebSocketEvents.MOVE_CAR:
+                    this.onMoveCar(payload.playerId, payload.carId, payload.x, payload.y, payload.angle);
                     break;
                 case WebSocketEvents.TALK:
                     this.onTalk(payload.from, payload.message);
@@ -70,10 +104,11 @@ export default class WebSocketClient {
                     break;
                 case "error":
                     console.error("WebSocket server error:", payload.message);
+                    this.onWsError(payload.message);
                     this.onError(new Event("error"));
                     break;
             }
-        }
+        };
 
         this.socket.onclose = () => {
             if (this.isClosedManually) {
@@ -118,6 +153,18 @@ export default class WebSocketClient {
 
     sendTalk(players: string[], message: string) {
         this.sendData(WebSocketEvents.TALK, { players, message });
+    }
+
+    sendEnterCar(carId: string) {
+        this.sendData(WebSocketEvents.ENTER_CAR, { carId });
+    }
+
+    sendLeaveCar(carId: string) {
+        this.sendData(WebSocketEvents.LEAVE_CAR, { carId });
+    }
+
+    sendMoveCar(carId: string, x: number, y: number, angle: number) {
+        this.sendData(WebSocketEvents.MOVE_CAR, { carId, x, y, angle });
     }
 
     reConnect() {
