@@ -31,6 +31,8 @@ export default class CityScene extends Phaser.Scene {
     private rightButton: Phaser.GameObjects.TileSprite | null = null;
     private upButton: Phaser.GameObjects.TileSprite | null = null;
     private downButton: Phaser.GameObjects.TileSprite | null = null;
+    private eButton: Phaser.GameObjects.Container | null = null;
+    private wasNearCar = false;
     private isSceneAlive = true;
 
     private housesLayer: Phaser.Tilemaps.TilemapLayer | null = null;
@@ -68,6 +70,16 @@ export default class CityScene extends Phaser.Scene {
                 this.load.spritesheet(`${CAR_NAME}.${color}`, sprite, { frameWidth: 100, frameHeight: 100 });
             }
         }
+    }
+
+    private isMobileDevice(): boolean {
+        return (
+            !this.sys.game.device.os.desktop ||
+            this.sys.game.device.input.touch ||
+            ('ontouchstart' in window) ||
+            (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) ||
+            this.scale.width <= 800
+        );
     }
 
     create() {
@@ -181,10 +193,10 @@ export default class CityScene extends Phaser.Scene {
         this.chatInput.setVisible(false);
 
         // Create Directional UI buttons
-        this.leftButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 105).setInteractive().setAlpha(0.6);
-        this.rightButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 90).setInteractive().setAlpha(0.6);
-        this.upButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 75).setInteractive().setAlpha(0.6);
-        this.downButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 60).setInteractive().setAlpha(0.6);
+        this.leftButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 105).setInteractive().setAlpha(0.75);
+        this.rightButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 90).setInteractive().setAlpha(0.75);
+        this.upButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 75).setInteractive().setAlpha(0.75);
+        this.downButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 60).setInteractive().setAlpha(0.75);
 
         [this.leftButton, this.rightButton, this.upButton, this.downButton].forEach(btn => {
             btn.setOrigin(0.5);
@@ -192,73 +204,80 @@ export default class CityScene extends Phaser.Scene {
             btn.setDepth(1000);
         });
 
-        if (this.sys.game.device.os.desktop) {
-            // Hide buttons on desktop
-            this.leftButton.setVisible(false);
-            this.rightButton.setVisible(false);
-            this.upButton.setVisible(false);
-            this.downButton.setVisible(false);
-        }
-        else {
-            // Show buttons on mobile
-            this.leftButton.setVisible(true);
-            this.rightButton.setVisible(true);
-            this.upButton.setVisible(true);
-            this.downButton.setVisible(true);
+        // Create 'E' action button for mobile
+        const eBtnBg = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 0).setAlpha(0.85);
 
-            // Touch/hold handling
-            this.leftButton.on('pointerdown', () => {
-                this.cursors ? this.cursors.left.isDown = true : null;
-                this.leftButton?.setTexture('buttons_ui', 107);
-            });
-            this.leftButton.on('pointerup', () => {
-                this.cursors ? this.cursors.left.isDown = false : null;
-                this.leftButton?.setTexture('buttons_ui', 105);
-            });
-            this.leftButton.on('pointerout', () => {
-                this.cursors ? this.cursors.left.isDown = false : null;
-                this.leftButton?.setTexture('buttons_ui', 105);
-            });
+        this.eButton = this.add.container(0, 0, [eBtnBg]);
+        this.eButton.setSize(32, 32);
+        this.eButton.setScrollFactor(0);
+        this.eButton.setDepth(1000);
+        this.eButton.setVisible(false);
+        this.eButton.setInteractive(new Phaser.Geom.Rectangle(-16, -16, 32, 32), Phaser.Geom.Rectangle.Contains);
+        this.eButton.setScrollFactor(0);
 
-            this.rightButton.on('pointerdown', () => {
-                this.cursors ? this.cursors.right.isDown = true : null;
-                this.rightButton?.setTexture('buttons_ui', 92);
-            });
-            this.rightButton.on('pointerup', () => {
-                this.cursors ? this.cursors.right.isDown = false : null;
-                this.rightButton?.setTexture('buttons_ui', 90);
-            });
-            this.rightButton.on('pointerout', () => {
-                this.cursors ? this.cursors.right.isDown = false : null;
-                this.rightButton?.setTexture('buttons_ui', 90);
-            });
+        this.eButton.on('pointerdown', () => {
+            this.eButton?.setScale(0.9);
+            this.#handleEPressed();
+        });
+        this.eButton.on('pointerup', () => {
+            this.eButton?.setScale(1.0);
+        });
+        this.eButton.on('pointerout', () => {
+            this.eButton?.setScale(1.0);
+        });
 
-            this.upButton.on('pointerdown', () => {
-                this.cursors ? this.cursors.up.isDown = true : null;
-                this.upButton?.setTexture('buttons_ui', 77);
-            });
-            this.upButton.on('pointerup', () => {
-                this.cursors ? this.cursors.up.isDown = false : null;
-                this.upButton?.setTexture('buttons_ui', 75);
-            });
-            this.upButton.on('pointerout', () => {
-                this.cursors ? this.cursors.up.isDown = false : null;
-                this.upButton?.setTexture('buttons_ui', 75);
-            });
+        // Touch/hold handling
+        this.leftButton.on('pointerdown', () => {
+            if (this.cursors) this.cursors.left.isDown = true;
+            this.leftButton?.setTexture('buttons_ui', 107);
+        });
+        this.leftButton.on('pointerup', () => {
+            if (this.cursors) this.cursors.left.isDown = false;
+            this.leftButton?.setTexture('buttons_ui', 105);
+        });
+        this.leftButton.on('pointerout', () => {
+            if (this.cursors) this.cursors.left.isDown = false;
+            this.leftButton?.setTexture('buttons_ui', 105);
+        });
 
-            this.downButton.on('pointerdown', () => {
-                this.cursors ? this.cursors.down.isDown = true : null;
-                this.downButton?.setTexture('buttons_ui', 62);
-            });
-            this.downButton.on('pointerup', () => {
-                this.cursors ? this.cursors.down.isDown = false : null;
-                this.downButton?.setTexture('buttons_ui', 60);
-            });
-            this.downButton.on('pointerout', () => {
-                this.cursors ? this.cursors.down.isDown = false : null;
-                this.downButton?.setTexture('buttons_ui', 60);
-            });
-        }
+        this.rightButton.on('pointerdown', () => {
+            if (this.cursors) this.cursors.right.isDown = true;
+            this.rightButton?.setTexture('buttons_ui', 92);
+        });
+        this.rightButton.on('pointerup', () => {
+            if (this.cursors) this.cursors.right.isDown = false;
+            this.rightButton?.setTexture('buttons_ui', 90);
+        });
+        this.rightButton.on('pointerout', () => {
+            if (this.cursors) this.cursors.right.isDown = false;
+            this.rightButton?.setTexture('buttons_ui', 90);
+        });
+
+        this.upButton.on('pointerdown', () => {
+            if (this.cursors) this.cursors.up.isDown = true;
+            this.upButton?.setTexture('buttons_ui', 77);
+        });
+        this.upButton.on('pointerup', () => {
+            if (this.cursors) this.cursors.up.isDown = false;
+            this.upButton?.setTexture('buttons_ui', 75);
+        });
+        this.upButton.on('pointerout', () => {
+            if (this.cursors) this.cursors.up.isDown = false;
+            this.upButton?.setTexture('buttons_ui', 75);
+        });
+
+        this.downButton.on('pointerdown', () => {
+            if (this.cursors) this.cursors.down.isDown = true;
+            this.downButton?.setTexture('buttons_ui', 62);
+        });
+        this.downButton.on('pointerup', () => {
+            if (this.cursors) this.cursors.down.isDown = false;
+            this.downButton?.setTexture('buttons_ui', 60);
+        });
+        this.downButton.on('pointerout', () => {
+            if (this.cursors) this.cursors.down.isDown = false;
+            this.downButton?.setTexture('buttons_ui', 60);
+        });
 
         this.#adjustUIElements();
 
@@ -328,6 +347,43 @@ export default class CityScene extends Phaser.Scene {
         return car;
     }
 
+    #handleEPressed() {
+        if (this.drivingCar) {
+            // Player cannot get down until the vehicle has completely stopped (speed is 0)
+            if (Math.abs(this.drivingCar.getSpeed()) <= 1) {
+                // Exit car
+                const car = this.drivingCar;
+                const carId = car.id;
+                car.setDriving(null);
+                const exitX = car.x;
+                const exitY = car.y;
+                const exitAngle = car.angle;
+                this.drivingCar = null;
+                if (this.player) {
+                    this.player.isDriving = false;
+                    const pSprite = this.player.getSprite();
+                    pSprite?.enableBody(true, exitX + 35, exitY, true, true);
+                    if (pSprite) {
+                        this.cameras.main.startFollow(pSprite, true);
+                    }
+                }
+                this.socket?.sendMoveCar(carId, exitX, exitY, exitAngle);
+                this.socket?.sendLeaveCar(carId);
+                this.#adjustUIElements();
+            }
+        } else if (this.player && !this.player.isDriving) {
+            // Check proximity to enter
+            for (const car of this.cars.values()) {
+                if (car.isDriving) continue; // Already driven by someone
+                const isNear = car.checkProximity(this.player.getPosition().x, this.player.getPosition().y);
+                if (isNear) {
+                    this.#requestEnterCar(car);
+                    break;
+                }
+            }
+        }
+    }
+
     update(time: number, delta: number) {
         if (!this.isSceneAlive) return;
 
@@ -342,43 +398,27 @@ export default class CityScene extends Phaser.Scene {
         // Toggle entering/exiting car with 'E' key
         const isEPressed = this.keyE ? Phaser.Input.Keyboard.JustDown(this.keyE) : false;
         if (isEPressed) {
-            if (this.drivingCar) {
-                // Player cannot get down until the vehicle has completely stopped (speed is 0)
-                if (Math.abs(this.drivingCar.getSpeed()) <= 1) {
-                    // Exit car
-                    const car = this.drivingCar;
-                    const carId = car.id;
-                    car.setDriving(null);
-                    const exitX = car.x;
-                    const exitY = car.y;
-                    const exitAngle = car.angle;
-                    this.drivingCar = null;
-                    if (this.player) {
-                        this.player.isDriving = false;
-                        const pSprite = this.player.getSprite();
-                        pSprite?.enableBody(true, exitX + 35, exitY, true, true);
-                        if (pSprite) {
-                            this.cameras.main.startFollow(pSprite, true);
-                        }
-                    }
-                    this.socket?.sendMoveCar(carId, exitX, exitY, exitAngle);
-                    this.socket?.sendLeaveCar(carId);
-                }
-            } else if (this.player && !this.player.isDriving) {
-                // Check proximity to enter
-                for (const car of this.cars.values()) {
-                    if (car.isDriving) continue; // Already driven by someone
-                    const isNear = car.checkProximity(this.player.getPosition().x, this.player.getPosition().y);
-                    if (isNear) {
-                        this.#requestEnterCar(car);
-                        break;
-                    }
-                }
-            }
+            this.#handleEPressed();
         }
 
         if (this.player && !this.player.isDriving) {
             this.player.update();
+        }
+
+        // Check proximity to available car when walking to show/hide mobile 'E' button
+        let isNearAvailableCar = false;
+        if (this.player && !this.player.isDriving) {
+            for (const car of this.cars.values()) {
+                if (!car.isDriving && car.checkProximity(this.player.getPosition().x, this.player.getPosition().y)) {
+                    isNearAvailableCar = true;
+                    break;
+                }
+            }
+        }
+
+        if (isNearAvailableCar !== this.wasNearCar) {
+            this.wasNearCar = isNearAvailableCar;
+            this.#adjustUIElements();
         }
 
         // Clean up any stale nears (e.g. disconnected or replaced players)
@@ -518,6 +558,7 @@ export default class CityScene extends Phaser.Scene {
                     if (car.getSprite()) {
                         this.cameras.main.startFollow(car.getSprite()!, true);
                     }
+                    this.#adjustUIElements();
                 }
             }
         }
@@ -668,6 +709,7 @@ export default class CityScene extends Phaser.Scene {
                 if (carSprite) {
                     this.cameras.main.startFollow(carSprite, true);
                 }
+                this.#adjustUIElements();
             }
         } else {
             const otherPlayer = this.otherPlayers.get(playerId);
@@ -730,6 +772,7 @@ export default class CityScene extends Phaser.Scene {
                             this.cameras.main.startFollow(pSprite, true);
                         }
                     }
+                    this.#adjustUIElements();
                 } else {
                     const otherPlayer = this.otherPlayers.get(driverId);
                     if (otherPlayer) {
@@ -819,40 +862,81 @@ export default class CityScene extends Phaser.Scene {
     }
 
     #adjustUIElements() {
-        const origin = {
-            x: this.cameras.main.centerX - 0.25 * this.scale.width,
-            y: this.cameras.main.centerY - 0.25 * this.scale.height
-        };
+        const showMobile = this.isMobileDevice();
 
-        const unit = {
-            x: 0.01 * this.scale.width / 2,
-            y: 0.01 * this.scale.height / 2
-        };
+        if (!showMobile) {
+            this.leftButton?.setVisible(false);
+            this.rightButton?.setVisible(false);
+            this.upButton?.setVisible(false);
+            this.downButton?.setVisible(false);
+            this.eButton?.setVisible(false);
+            return;
+        }
 
-        const getPosition = (x: number, y: number) => {
-            return {
-                x: origin.x + x * unit.x,
-                y: origin.y + y * unit.y
-            };
-        };
+        const zoom = this.cameras.main.zoom || 1;
+        const centerX = this.cameras.main.centerX;
+        const centerY = this.cameras.main.centerY;
 
-        const chatInputPosition = getPosition(50, 80);
-        this.chatInput?.setPosition(chatInputPosition.x, chatInputPosition.y);
+        const minX = centerX - (this.scale.width / (2 * zoom));
+        const maxX = centerX + (this.scale.width / (2 * zoom));
+        const minY = centerY - (this.scale.height / (2 * zoom));
+        const maxY = centerY + (this.scale.height / (2 * zoom));
 
-        const { x: baseX, y: baseY } = getPosition(15, 50);
-        const size = 10;
-        const margin = 16;
-
-        this.leftButton?.setPosition(baseX - size - margin, baseY);
-        this.rightButton?.setPosition(baseX + size + margin, baseY);
-        this.upButton?.setPosition(baseX, baseY - size - margin);
-        this.downButton?.setPosition(baseX, baseY + size + margin);
-
-        [this.leftButton, this.rightButton, this.upButton, this.downButton].forEach(btn => {
-            btn?.setOrigin(0.5);
-            btn?.setScrollFactor(0);
-            btn?.setDepth(1000);
+        const getPos = (pctX: number, pctY: number) => ({
+            x: minX + (maxX - minX) * (pctX / 100),
+            y: minY + (maxY - minY) * (pctY / 100)
         });
+
+        const isDriving = !!this.drivingCar;
+
+        if (isDriving) {
+            // DRIVING LAYOUT:
+            // Left Half: Left & Right keys side by side
+            const leftKeyPos = getPos(14, 80);
+            const rightKeyPos = getPos(28, 80);
+
+            this.leftButton?.setPosition(leftKeyPos.x, leftKeyPos.y);
+            this.rightButton?.setPosition(rightKeyPos.x, rightKeyPos.y);
+            this.leftButton?.setVisible(true);
+            this.rightButton?.setVisible(true);
+
+            // Right Half: Up & Down keys, and E key above them
+            const downPos = getPos(86, 82);
+            const upPos = getPos(86, 58);
+            const ePos = getPos(86, 34);
+
+            this.downButton?.setPosition(downPos.x, downPos.y);
+            this.upButton?.setPosition(upPos.x, upPos.y);
+            this.eButton?.setPosition(ePos.x, ePos.y);
+
+            this.downButton?.setVisible(true);
+            this.upButton?.setVisible(true);
+            this.eButton?.setVisible(true);
+        } else {
+            // WALKING LAYOUT:
+            // D-Pad on bottom-left
+            const center = getPos(18, 76);
+            const offset = 26; // In game coordinates
+
+            this.leftButton?.setPosition(center.x - offset, center.y);
+            this.rightButton?.setPosition(center.x + offset, center.y);
+            this.upButton?.setPosition(center.x, center.y - offset);
+            this.downButton?.setPosition(center.x, center.y + offset);
+
+            this.leftButton?.setVisible(true);
+            this.rightButton?.setVisible(true);
+            this.upButton?.setVisible(true);
+            this.downButton?.setVisible(true);
+
+            // E Button on bottom-right (only visible when in proximity to an available vehicle)
+            const ePos = getPos(84, 76);
+            this.eButton?.setPosition(ePos.x, ePos.y);
+            this.eButton?.setVisible(this.wasNearCar);
+        }
+
+        // Chat input positioning (centered at bottom)
+        const chatInputPos = getPos(50, 90);
+        this.chatInput?.setPosition(chatInputPos.x, chatInputPos.y);
     }
 
     private INTERP_DURATION = 120; // ms
