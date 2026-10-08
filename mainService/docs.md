@@ -239,40 +239,234 @@ These endpoints are for creating and searching for game worlds.
 
 ## Real-time Communication (WebSocket)
 
-The WebSocket server handles real-time player interactions.
+The WebSocket server handles real-time player and vehicle interactions, chat, and synchronization across worlds.
 
 ### Connecting
 
 - **URL**: `ws://<main-service-host>/?token=<player-token>`
-- **Note**: The `player-token` is obtained from the `GET /user/:playerId` endpoint.
+- **Note**: The `player-token` is obtained from the `GET /user/:playerId` endpoint or `POST /user/guest`.
 
-### WebSocket Events
+### Message Envelope Structure
 
-sample Format: 
+All messages exchanged over WebSocket follow the standard envelope format:
 ```json
-  {
-    "type": "string",
-    "payload": "Payload" 
-  }
+{
+  "type": "string",
+  "payload": {}
+}
 ```
 
-#### Incoming Events
+---
 
-- **`enter`**: A player has entered your area of interest.
-  - **Payload**: `{ "playerId": "string" }`
-- **`leave`**: A player has left your area of interest.
-  - **Payload**: `{ "playerId": "string" }`
-- **`move`**: A player has moved.
-  - **Payload**: `{ "playerId": "string", "x": "number", "y": "number", "animation": "string", "timestamp": "number" }`
-- **`talk`**: You have received a message from another player.
-  - **Payload**: `{ "from": "string", "message": "string" }`
+### Incoming Events (Server → Client)
 
-#### Outgoing Events
+#### 1. `init`
+Sent to the connecting client immediately upon entering the world, containing the full initial snapshot of self, other players, and vehicles.
+- **Payload**:
+  ```json
+  {
+    "self": {
+      "id": "string",
+      "name": "string",
+      "spritesheet": "string",
+      "wealth": "number",
+      "checkpoint": { "x": "number", "y": "number" },
+      "position": { "x": "number", "y": "number" },
+      "animation": "string",
+      "timestamp": "number",
+      "isDriving": "string | undefined"
+    },
+    "players": [
+      {
+        "id": "string",
+        "name": "string",
+        "spritesheet": "string",
+        "wealth": "number",
+        "checkpoint": { "x": "number", "y": "number" },
+        "position": { "x": "number", "y": "number" },
+        "animation": "string",
+        "timestamp": "number",
+        "isDriving": "string | undefined"
+      }
+    ],
+    "cars": [
+      {
+        "id": "string",
+        "spriteKey": "string",
+        "position": { "x": "number", "y": "number", "angle": "number" },
+        "isDriving": "string | null",
+        "timestamp": "number"
+      }
+    ]
+  }
+  ```
 
-- **`move`**: Broadcast your player's movement.
-  - **Payload**: `{ "x": "number", "y": "number", "animation": "string", "timestamp": "number" }`
-- **`talk`**: Send a message to specific players.
-  - **Payload**: `{ "players": ["playerId1", "playerId2"], "message": "string" }`
+#### 2. `enter`
+Broadcast to other players in the world when a new player joins.
+- **Payload**:
+  ```json
+  {
+    "player": {
+      "id": "string",
+      "name": "string",
+      "spritesheet": "string",
+      "wealth": "number",
+      "checkpoint": { "x": "number", "y": "number" },
+      "position": { "x": "number", "y": "number" },
+      "animation": "string",
+      "timestamp": "number",
+      "isDriving": "string | undefined"
+    }
+  }
+  ```
+
+#### 3. `leave`
+Broadcast to players when another player disconnects or leaves the world.
+- **Payload**:
+  ```json
+  {
+    "playerId": "string"
+  }
+  ```
+
+#### 4. `move`
+Broadcast when an on-foot player moves within proximity.
+- **Payload**:
+  ```json
+  {
+    "playerId": "string",
+    "x": "number",
+    "y": "number",
+    "animation": "string",
+    "timestamp": "number"
+  }
+  ```
+
+#### 5. `enter_car`
+Broadcast when a player enters/takes control of a vehicle (also sent back to confirming client upon success).
+- **Payload**:
+  ```json
+  {
+    "playerId": "string",
+    "carId": "string"
+  }
+  ```
+
+#### 6. `leave_car`
+Broadcast when a player disembarks from a vehicle.
+- **Payload**:
+  ```json
+  {
+    "playerId": "string",
+    "carId": "string"
+  }
+  ```
+
+#### 7. `move_car`
+Broadcast when a player driving a vehicle moves or rotates.
+- **Payload**:
+  ```json
+  {
+    "playerId": "string",
+    "carId": "string",
+    "x": "number",
+    "y": "number",
+    "angle": "number"
+  }
+  ```
+
+#### 8. `talk`
+Delivered when a chat message is received from another player.
+- **Payload**:
+  ```json
+  {
+    "from": "string (playerId)",
+    "message": "string"
+  }
+  ```
+
+#### 9. `pong`
+Server response to client heartbeat `ping`.
+- **Payload**:
+  ```json
+  {
+    "timestamp": "number"
+  }
+  ```
+
+#### 10. `error`
+Sent when a request fails (e.g. attempting to enter a car already occupied by someone else).
+- **Payload**:
+  ```json
+  {
+    "message": "string"
+  }
+  ```
+
+---
+
+### Outgoing Events (Client → Server)
+
+#### 1. `move`
+Broadcast local player movement on foot.
+- **Payload**:
+  ```json
+  {
+    "x": "number",
+    "y": "number",
+    "animation": "string",
+    "timestamp": "number"
+  }
+  ```
+
+#### 2. `enter_car`
+Request to enter and take control of a specific vehicle.
+- **Payload**:
+  ```json
+  {
+    "carId": "string"
+  }
+  ```
+
+#### 3. `leave_car`
+Notify the server that the player has exited their vehicle.
+- **Payload**:
+  ```json
+  {
+    "carId": "string"
+  }
+  ```
+
+#### 4. `move_car`
+Broadcast vehicle position and orientation while driving.
+- **Payload**:
+  ```json
+  {
+    "carId": "string",
+    "x": "number",
+    "y": "number",
+    "angle": "number"
+  }
+  ```
+
+#### 5. `talk`
+Send a chat message to specific recipient player IDs.
+- **Payload**:
+  ```json
+  {
+    "players": ["string (playerId)"],
+    "message": "string"
+  }
+  ```
+
+#### 6. `ping`
+Heartbeat check to determine latency.
+- **Payload**:
+  ```json
+  {
+    "timestamp": "number"
+  }
+  ```
 
 ---
 

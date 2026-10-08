@@ -869,7 +869,7 @@ export default class CityScene extends Phaser.Scene {
         if (otherSprite) {
             if (this.housesLayer) this.physics.add.collider(otherSprite, this.housesLayer);
             if (this.treesLayer) this.physics.add.collider(otherSprite, this.treesLayer);
-            if (this.player?.getSprite()) this.physics.add.collider(this.player.getSprite(), mechanicalOrOther(otherSprite));
+            if (this.player?.getSprite()) this.physics.add.collider(this.player.getSprite(), otherSprite);
 
             for (const car of this.cars.values()) {
                 const carSprite = car.getSprite();
@@ -1040,7 +1040,4 @@ export default class CityScene extends Phaser.Scene {
         this.player?.destroy();
         this.player = null;
     }
-}
-function mechanicalOrOther(otherSprite: Phaser.Physics.Arcade.Sprite): Phaser.GameObjects.GameObject | Phaser.GameObjects.Group | Phaser.GameObjects.GameObject[] | Phaser.GameObjects.Group[] {
-    return otherSprite;
 }
