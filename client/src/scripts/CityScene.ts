@@ -31,7 +31,8 @@ export default class CityScene extends Phaser.Scene {
     private rightButton: Phaser.GameObjects.TileSprite | null = null;
     private upButton: Phaser.GameObjects.TileSprite | null = null;
     private downButton: Phaser.GameObjects.TileSprite | null = null;
-    private eButton: Phaser.GameObjects.Container | null = null;
+    private eButton: Phaser.GameObjects.TileSprite | null = null;
+    private activePointersByButton: Map<string, number> = new Map();
     private wasNearCar = false;
     private isSceneAlive = true;
 
@@ -52,8 +53,8 @@ export default class CityScene extends Phaser.Scene {
     }
 
     preload() {
-        // Preload tilemap and tileset
-        this.load.image('tiles', 'assets/city/tileset.png');
+        // Preload tilemap and extruded tileset to prevent texture bleeding
+        this.load.image('tiles', 'assets/city/tileset_extruded.png');
         this.load.tilemapTiledJSON('city_map', 'assets/city/map.json');
 
         // Preload all character sprites
@@ -85,11 +86,14 @@ export default class CityScene extends Phaser.Scene {
     create() {
         this.isSceneAlive = true;
 
+        // Ensure multi-touch pointers are available
+        this.input.addPointer(2);
+
         this.textures.get("tiles").setFilter(Phaser.Textures.FilterMode.NEAREST);
         
-        // Load the tilemap
+        // Load the tilemap with extruded tileset (margin 1, spacing 2) to eliminate tile seam lines
         this.map = this.make.tilemap({ key: 'city_map' });
-        const tileset = this.map.addTilesetImage('tileset', 'tiles');
+        const tileset = this.map.addTilesetImage('tileset', 'tiles', 16, 16, 1, 2);
 
         if (!tileset) {
             console.error("Failed to load tileset");
@@ -106,7 +110,7 @@ export default class CityScene extends Phaser.Scene {
             return;
         }
 
-        // Expand cull padding to prevent tile tearing/flickering at high speeds or screen edges
+        // Expand cull padding to prevent tile tearing/flickering at screen edges
         base_layer.setCullPadding(6, 6);
         grass_flowers.setCullPadding(6, 6);
         this.housesLayer.setCullPadding(6, 6);
@@ -120,11 +124,10 @@ export default class CityScene extends Phaser.Scene {
         this.keyE = this.input.keyboard ? this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E) : null;
         this.player = new Player(this, this.playerData, this.cursors);
 
-        // Set camera to follow player with pixel rounding enabled
+        // Set camera to follow player
         this.cameras.main.startFollow(this.player.getSprite(), true);
         this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
         this.cameras.main.setZoom(2);
-        this.cameras.main.setRoundPixels(true);
 
         // Setup collisions for Arcade Player
         this.physics.add.collider(this.player.getSprite(), this.housesLayer);
@@ -192,91 +195,84 @@ export default class CityScene extends Phaser.Scene {
         this.chatInput.setScrollFactor(0);
         this.chatInput.setVisible(false);
 
-        // Create Directional UI buttons
+        // UI buttons
         this.leftButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 105).setInteractive().setAlpha(0.75);
         this.rightButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 90).setInteractive().setAlpha(0.75);
         this.upButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 75).setInteractive().setAlpha(0.75);
         this.downButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 60).setInteractive().setAlpha(0.75);
+        this.eButton = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 0).setInteractive().setAlpha(0.85);
 
-        [this.leftButton, this.rightButton, this.upButton, this.downButton].forEach(btn => {
+        [this.leftButton, this.rightButton, this.upButton, this.downButton, this.eButton].forEach(btn => {
             btn.setOrigin(0.5);
             btn.setScrollFactor(0);
             btn.setDepth(1000);
         });
 
-        // Create 'E' action button for mobile
-        const eBtnBg = this.add.tileSprite(0, 0, 32, 32, 'buttons_ui', 0).setAlpha(0.85);
-
-        this.eButton = this.add.container(0, 0, [eBtnBg]);
-        this.eButton.setSize(32, 32);
-        this.eButton.setScrollFactor(0);
-        this.eButton.setDepth(1000);
-        this.eButton.setVisible(false);
-        this.eButton.setInteractive(new Phaser.Geom.Rectangle(-16, -16, 32, 32), Phaser.Geom.Rectangle.Contains);
-        this.eButton.setScrollFactor(0);
-
-        this.eButton.on('pointerdown', () => {
-            this.eButton?.setScale(0.9);
-            this.#handleEPressed();
-        });
-        this.eButton.on('pointerup', () => {
-            this.eButton?.setScale(1.0);
-        });
-        this.eButton.on('pointerout', () => {
-            this.eButton?.setScale(1.0);
-        });
-
-        // Touch/hold handling
-        this.leftButton.on('pointerdown', () => {
+        // Robust multi-touch binding for buttons
+        this.#bindMultiTouchButton(this.leftButton, 'left', 107, 105, () => {
             if (this.cursors) this.cursors.left.isDown = true;
-            this.leftButton?.setTexture('buttons_ui', 107);
-        });
-        this.leftButton.on('pointerup', () => {
+        }, () => {
             if (this.cursors) this.cursors.left.isDown = false;
-            this.leftButton?.setTexture('buttons_ui', 105);
-        });
-        this.leftButton.on('pointerout', () => {
-            if (this.cursors) this.cursors.left.isDown = false;
-            this.leftButton?.setTexture('buttons_ui', 105);
         });
 
-        this.rightButton.on('pointerdown', () => {
+        this.#bindMultiTouchButton(this.rightButton, 'right', 92, 90, () => {
             if (this.cursors) this.cursors.right.isDown = true;
-            this.rightButton?.setTexture('buttons_ui', 92);
-        });
-        this.rightButton.on('pointerup', () => {
+        }, () => {
             if (this.cursors) this.cursors.right.isDown = false;
-            this.rightButton?.setTexture('buttons_ui', 90);
-        });
-        this.rightButton.on('pointerout', () => {
-            if (this.cursors) this.cursors.right.isDown = false;
-            this.rightButton?.setTexture('buttons_ui', 90);
         });
 
-        this.upButton.on('pointerdown', () => {
+        this.#bindMultiTouchButton(this.upButton, 'up', 77, 75, () => {
             if (this.cursors) this.cursors.up.isDown = true;
-            this.upButton?.setTexture('buttons_ui', 77);
-        });
-        this.upButton.on('pointerup', () => {
+        }, () => {
             if (this.cursors) this.cursors.up.isDown = false;
-            this.upButton?.setTexture('buttons_ui', 75);
-        });
-        this.upButton.on('pointerout', () => {
-            if (this.cursors) this.cursors.up.isDown = false;
-            this.upButton?.setTexture('buttons_ui', 75);
         });
 
-        this.downButton.on('pointerdown', () => {
+        this.#bindMultiTouchButton(this.downButton, 'down', 62, 60, () => {
             if (this.cursors) this.cursors.down.isDown = true;
-            this.downButton?.setTexture('buttons_ui', 62);
-        });
-        this.downButton.on('pointerup', () => {
+        }, () => {
             if (this.cursors) this.cursors.down.isDown = false;
-            this.downButton?.setTexture('buttons_ui', 60);
         });
-        this.downButton.on('pointerout', () => {
-            if (this.cursors) this.cursors.down.isDown = false;
-            this.downButton?.setTexture('buttons_ui', 60);
+
+        if (this.eButton) {
+            this.eButton.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+                this.activePointersByButton.set('e', pointer.id);
+                this.eButton?.setScale(0.9);
+                this.#handleEPressed();
+            });
+
+            const releaseE = (pointer: Phaser.Input.Pointer) => {
+                if (this.activePointersByButton.get('e') === pointer.id) {
+                    this.activePointersByButton.delete('e');
+                    this.eButton?.setScale(1.0);
+                }
+            };
+
+            this.eButton.on('pointerup', releaseE);
+            this.eButton.on('pointerout', releaseE);
+        }
+
+        // Global pointer up fallback to release any stuck touches
+        this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+            for (const [key, ptrId] of this.activePointersByButton.entries()) {
+                if (ptrId === pointer.id) {
+                    this.activePointersByButton.delete(key);
+                    if (key === 'left') {
+                        if (this.cursors) this.cursors.left.isDown = false;
+                        this.leftButton?.setTexture('buttons_ui', 105);
+                    } else if (key === 'right') {
+                        if (this.cursors) this.cursors.right.isDown = false;
+                        this.rightButton?.setTexture('buttons_ui', 90);
+                    } else if (key === 'up') {
+                        if (this.cursors) this.cursors.up.isDown = false;
+                        this.upButton?.setTexture('buttons_ui', 75);
+                    } else if (key === 'down') {
+                        if (this.cursors) this.cursors.down.isDown = false;
+                        this.downButton?.setTexture('buttons_ui', 60);
+                    } else if (key === 'e') {
+                        this.eButton?.setScale(1.0);
+                    }
+                }
+            }
         });
 
         this.#adjustUIElements();
@@ -299,6 +295,34 @@ export default class CityScene extends Phaser.Scene {
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.#handleShutdown, this);
         this.events.once(Phaser.Scenes.Events.DESTROY, this.#handleShutdown, this);
+    }
+
+    #bindMultiTouchButton(
+        button: Phaser.GameObjects.TileSprite | null,
+        key: string,
+        activeFrame: number,
+        inactiveFrame: number,
+        onPress: () => void,
+        onRelease: () => void
+    ) {
+        if (!button) return;
+
+        button.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            this.activePointersByButton.set(key, pointer.id);
+            button.setTexture('buttons_ui', activeFrame);
+            onPress();
+        });
+
+        const handleRelease = (pointer: Phaser.Input.Pointer) => {
+            if (this.activePointersByButton.get(key) === pointer.id) {
+                this.activePointersByButton.delete(key);
+                button.setTexture('buttons_ui', inactiveFrame);
+                onRelease();
+            }
+        };
+
+        button.on('pointerup', handleRelease);
+        button.on('pointerout', handleRelease);
     }
 
     addCar(
@@ -845,7 +869,7 @@ export default class CityScene extends Phaser.Scene {
         if (otherSprite) {
             if (this.housesLayer) this.physics.add.collider(otherSprite, this.housesLayer);
             if (this.treesLayer) this.physics.add.collider(otherSprite, this.treesLayer);
-            if (this.player?.getSprite()) this.physics.add.collider(this.player.getSprite(), otherSprite);
+            if (this.player?.getSprite()) this.physics.add.collider(this.player.getSprite(), mechanicalOrOther(otherSprite));
 
             for (const car of this.cars.values()) {
                 const carSprite = car.getSprite();
@@ -915,7 +939,7 @@ export default class CityScene extends Phaser.Scene {
         } else {
             // WALKING LAYOUT:
             // D-Pad on bottom-left
-            const center = getPos(18, 76);
+            const center = getPos(18, 56);
             const offset = 26; // In game coordinates
 
             this.leftButton?.setPosition(center.x - offset, center.y);
@@ -1016,4 +1040,7 @@ export default class CityScene extends Phaser.Scene {
         this.player?.destroy();
         this.player = null;
     }
+}
+function mechanicalOrOther(otherSprite: Phaser.Physics.Arcade.Sprite): Phaser.GameObjects.GameObject | Phaser.GameObjects.Group | Phaser.GameObjects.GameObject[] | Phaser.GameObjects.Group[] {
+    return otherSprite;
 }

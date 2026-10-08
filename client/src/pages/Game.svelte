@@ -7,7 +7,7 @@
     import SFUClient from "../lib/sfu";
     import * as api from "../lib/api";
 
-    const TEST_SFU = import.meta.env.VITE_ENABLE_SFU || false;
+    const TEST_SFU = import.meta.env.VITE_ENABLE_SFU === true || import.meta.env.VITE_ENABLE_SFU === "true";
     let game: Phaser.Game | null = null;
     let fullscreen = false;
     let playerData: any = null;
@@ -159,7 +159,7 @@
                 render: {
                     antialias: false,
                     antialiasGL: false,
-                    roundPixels: true,
+                    roundPixels: false,
                     pixelArt: true,
                 },
 
@@ -170,6 +170,13 @@
 
                 dom: {
                     createContainer: true,
+                },
+
+                input: {
+                    activePointers: 3, // Enable multi-touch pointers
+                    touch: {
+                        capture: true
+                    }
                 },
 
                 scene: [],
@@ -388,6 +395,9 @@
         inset: 0;
         width: 100%;
         height: 100%;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
     }
 
     .video-dock {
